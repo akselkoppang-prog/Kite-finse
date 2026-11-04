@@ -19,13 +19,15 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       caches.open(TILE_CACHE).then(async (c) => {
         const hit = await c.match(e.request.url);
-        if (hit) return hit;
+        // Kart i <img> (Leaflet) kan bruke et «opakt» svar, men PDF-eksporten tegner flisen på et lerret og
+        // trenger et CORS-svar. Har vi bare en opak kopi, hent en lesbar kopi fra nettet og erstatt den.
+        if (hit && (hit.type !== 'opaque' || e.request.mode !== 'cors')) return hit;
         try {
           const res = await fetch(e.request);
-          c.put(e.request.url, res.clone());
+          if (res.ok || res.type === 'opaque') c.put(e.request.url, res.clone());
           return res;
         } catch (err) {
-          return Response.error();
+          return hit ?? Response.error();
         }
       }),
     );
