@@ -1,14 +1,21 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Camp, Place, Route, Waypoint, Zone } from '../types';
+import type { Camp, HistoryEntry, LakeOverride, Marker, Place, Quiver, Route, Waypoint, Zone } from '../types';
+import type { Category } from '../data/categories';
+import { DEFAULT_PARAMS, DEFAULT_SCENARIOS, type Scenario, type TravelParams } from '../lib/analysis/feasibility';
+import type { Forecast } from '../lib/api/met';
+import { DEFAULT_PACKING, type PackItem } from '../data/packing';
 import type { Dir8 } from '../lib/geo';
 import type { NveHydro, PolyFeature } from '../lib/api/nve';
 import type { TerrainAnalysis } from '../lib/analysis/terrain';
 import type { Snow, Terrain, Goal } from '../lib/analysis/kite';
 import { uid } from '../lib/geo';
 
-export type Tab = 'kart' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'tidslinje' | 'kilder';
-export type EditMode = 'none' | 'add' | 'insert' | 'zone' | 'camp';
+export type Tab = 'kart' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder';
+export type EditMode = 'none' | 'add' | 'insert' | 'zone' | 'camp' | 'marker';
+
+export interface WindPoint { label: string; lat: number; lon: number; fc: Forecast }
+export interface FoodPlan { kcalPerDay: number; kcalPerKg: number; fuelLPerDay: number; reserveDays: number; extraDays: number }
 
 export interface LayerToggles {
   base: 'topo' | 'graatone' | 'raster';
@@ -23,6 +30,9 @@ export interface LayerToggles {
   zones: boolean;
   windColor: boolean;
   steep: boolean;
+  markers: boolean;
+  windArrows: boolean;
+  dayBreaks: boolean;
 }
 
 export interface WmsConfig { url: string; layers: string }
@@ -57,6 +67,27 @@ export interface State {
   editMode: EditMode;
   focus: { lat: number; lon: number; zoom?: number; t: number } | null;
   selectedWp: string | null;
+  selectedMarker: string | null;
+  selectedBarrier: string | null;
+  markers: Marker[];
+  customCategories: Category[];
+  hiddenCategories: string[];
+  lakeOverrides: LakeOverride[];
+  quivers: Quiver[];
+  activeQuiverId: string;
+  kiteNotes: Record<string, string>;
+  tripDays: number;
+  altDates: string[];
+  travel: TravelParams;
+  scenarios: Scenario[];
+  scenarioId: 'A' | 'B' | 'C';
+  dayNotes: Record<string, string>;
+  packing: PackItem[];
+  food: FoodPlan;
+  history: HistoryEntry[];
+  frostClientId: string;
+  forecastHour: number;
+  windPoints: WindPoint[];
 
   set: (p: Partial<State>) => void;
   setTab: (t: Tab) => void;
@@ -72,9 +103,17 @@ export interface State {
   duplicateRoute: (id: string) => void;
   setLayer: <K extends keyof LayerToggles>(k: K, v: LayerToggles[K]) => void;
   focusOn: (lat: number, lon: number, zoom?: number) => void;
+  log: (kind: HistoryEntry['kind'], text: string) => void;
+  updateWaypoint: (routeId: string, wpId: string, patch: Partial<Waypoint>) => void;
+  moveWaypointIndex: (routeId: string, wpId: string, dir: -1 | 1) => void;
+  setDayBreaks: (routeId: string, breaks: number[]) => void;
+  upsertOverride: (o: LakeOverride, text: string) => void;
 }
 
 const now = () => new Date().toISOString();
+function pushHist(h: HistoryEntry[], kind: HistoryEntry['kind'], text: string): HistoryEntry[] {
+  return [{ at: now(), kind, text }, ...h].slice(0, 300);
+}
 
 export const useStore = create<State>()(
   persist(
@@ -103,7 +142,7 @@ export const useStore = create<State>()(
       checklist: {},
       timeline: {},
       acks: {},
-      layers: { base: 'topo', nveWms: false, skredWms: false, reservoirs: true, lakes: true, places: true, routes: true, alternatives: true, camps: true, zones: true, windColor: false, steep: true },
+      layers: { base: 'topo', nveWms: false, skredWms: false, reservoirs: true, lakes: true, places: true, routes: true, alternatives: true, camps: true, zones: true, windColor: false, steep: true, markers: true, windArrows: true, dayBreaks: true },
       wms: {
         nve: { url: 'https://nve.geodataonline.no/arcgis/services/Vannkraft1/MapServer/WmsServer', layers: '' },
         skred: { url: 'https://nve.geodataonline.no/arcgis/services/Bratthet/MapServer/WMSServer', layers: '' },
@@ -111,6 +150,30 @@ export const useStore = create<State>()(
       editMode: 'none',
       focus: null,
       selectedWp: null,
+      selectedMarker: null,
+      selectedBarrier: null,
+      markers: [],
+      customCategories: [],
+      hiddenCategories: [],
+      lakeOverrides: [],
+      quivers: [
+        { id: 'q-forslag', name: 'Forslag (rådgivende)', kiteIds: ['peak4', 'hyper7', 'sonic10', 'soul15'], primary: 'sonic10', secondary: 'soul15', storm: 'peak4', note: 'Verktøyets forslag – endre fritt.' },
+        { id: 'q-alle', name: 'Hele inventaret', kiteIds: ['peak4', 'hyper7', 'stoke9', 'sonic10', 'pivot10', 'soul15', 'soul18'], primary: 'sonic10' },
+      ],
+      activeQuiverId: 'q-forslag',
+      kiteNotes: {},
+      tripDays: 3,
+      altDates: [],
+      travel: DEFAULT_PARAMS,
+      scenarios: DEFAULT_SCENARIOS,
+      scenarioId: 'A',
+      dayNotes: {},
+      packing: DEFAULT_PACKING,
+      food: { kcalPerDay: 4500, kcalPerKg: 4800, fuelLPerDay: 0.2, reserveDays: 1, extraDays: 0 },
+      history: [],
+      frostClientId: '',
+      forecastHour: 0,
+      windPoints: [],
 
       set: (p) => set(p),
       setTab: (tab) => set({ tab }),
@@ -124,13 +187,14 @@ export const useStore = create<State>()(
       updateWaypoints: (routeId, wps) => set((s) => ({ routes: s.routes.map((r) => (r.id === routeId ? { ...r, waypoints: wps, updatedAt: now() } : r)) })),
       moveWaypoint: (routeId, wpId, lat, lon) =>
         set((s) => ({
+          history: pushHist(s.history, 'rute', `Flyttet punkt i «${s.routes.find((r) => r.id === routeId)?.name}» til ${lat.toFixed(4)}, ${lon.toFixed(4)}`),
           routes: s.routes.map((r) =>
             r.id === routeId
               ? { ...r, updatedAt: now(), waypoints: r.waypoints.map((w) => (w.id === wpId ? { ...w, lat, lon, eleGpx: undefined, dataKind: 'forslag', source: `${w.source} → flyttet manuelt ${now().slice(0, 10)}` } : w)) }
               : r,
           ),
         })),
-      deleteWaypoint: (routeId, wpId) => set((s) => ({ routes: s.routes.map((r) => (r.id === routeId ? { ...r, updatedAt: now(), waypoints: r.waypoints.filter((w) => w.id !== wpId) } : r)) })),
+      deleteWaypoint: (routeId, wpId) => set((s) => ({ history: pushHist(s.history, 'rute', `Slettet punkt ${s.routes.find((r) => r.id === routeId)?.waypoints.find((w) => w.id === wpId)?.name ?? ''} i «${s.routes.find((r) => r.id === routeId)?.name}»`), routes: s.routes.map((r) => (r.id === routeId ? { ...r, updatedAt: now(), waypoints: r.waypoints.filter((w) => w.id !== wpId) } : r)) })),
       renameWaypoint: (routeId, wpId, name) =>
         set((s) => ({ routes: s.routes.map((r) => (r.id === routeId ? { ...r, waypoints: r.waypoints.map((w) => (w.id === wpId ? { ...w, name, kind: name ? 'stopp' : w.kind } : w)) } : r)) })),
       addWaypoint: (routeId, lat, lon) =>
@@ -163,6 +227,30 @@ export const useStore = create<State>()(
           const copy: Route = { ...r, id: uid('rt'), name: `${r.name} (kopi)`, kind: 'egen', color: '#f472b6', createdAt: now(), updatedAt: now(), waypoints: r.waypoints.map((w) => ({ ...w, id: uid('wp') })) };
           return { routes: [...s.routes, copy], activeRouteId: copy.id };
         }),
+      log: (kind, text) => set((s) => ({ history: pushHist(s.history, kind, text) })),
+      updateWaypoint: (routeId, wpId, patch) =>
+        set((s) => ({
+          routes: s.routes.map((r) => (r.id === routeId ? { ...r, updatedAt: now(), waypoints: r.waypoints.map((w) => (w.id === wpId ? { ...w, ...patch, updatedAt: now(), createdAt: w.createdAt ?? now() } : w)) } : r)),
+        })),
+      moveWaypointIndex: (routeId, wpId, dir) =>
+        set((s) => ({
+          history: pushHist(s.history, 'rute', `Endret rekkefølge på punkt i «${s.routes.find((r) => r.id === routeId)?.name}»`),
+          routes: s.routes.map((r) => {
+            if (r.id !== routeId) return r;
+            const i = r.waypoints.findIndex((w) => w.id === wpId);
+            const j = i + dir;
+            if (i < 0 || j < 0 || j >= r.waypoints.length) return r;
+            const wps = [...r.waypoints];
+            [wps[i], wps[j]] = [wps[j], wps[i]];
+            return { ...r, waypoints: wps, updatedAt: now() };
+          }),
+        })),
+      setDayBreaks: (routeId, breaks) => set((s) => ({ routes: s.routes.map((r) => (r.id === routeId ? { ...r, dayBreaks: [...breaks].sort((a, b) => a - b) } : r)) })),
+      upsertOverride: (o, text) =>
+        set((s) => ({
+          lakeOverrides: s.lakeOverrides.some((x) => x.id === o.id) ? s.lakeOverrides.map((x) => (x.id === o.id ? o : x)) : [...s.lakeOverrides, o],
+          history: pushHist(s.history, 'overstyring', text),
+        })),
       setLayer: (k, v) => set((s) => ({ layers: { ...s.layers, [k]: v } })),
       focusOn: (lat, lon, zoom) => set({ focus: { lat, lon, zoom, t: Date.now() }, tab: 'kart' }),
     }),
@@ -171,7 +259,7 @@ export const useStore = create<State>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { focus, editMode, draftZone, selectedWp, set: _s, ...rest } = s;
+        const { focus, editMode, draftZone, selectedWp, selectedMarker, selectedBarrier, forecastHour, windPoints, set: _s, ...rest } = s;
         return Object.fromEntries(Object.entries(rest).filter(([, v]) => typeof v !== 'function')) as Partial<State>;
       },
     },

@@ -38,6 +38,31 @@ Slå på Pages i repoets innstillinger (Settings → Pages → Source: GitHub Ac
 
 Planen lagres automatisk i nettleseren (localStorage).
 
+## Versjon 2 – nye funksjoner
+
+| Funksjon | Hvor | Merknad |
+|---|---|---|
+| **Vann-whitelist** (brukerstyrt overstyring) | Klikk et vann eller en kryssing i kartet · fanen *Overstyringer* | Typer: tur, sesong, permanent. Utløpsdato, krav om gjennomgang før avreise, personlig begrunnelse (påkrevd), kildelenke og hvilken strekning (km) den gjelder. Vises som **USER OVERRIDE** (stiplet turkis). NVE-status endres aldri; dammer innen 500 m og egne forbudte soner blokkerer fortsatt. |
+| **Egen kite-quiver** | *Kite-quiver* | Velg/fjern hver kite, primær/sekundær/sterkvind, notater per kite, flere lagrede quivers, dekningssammenligning (2–22 m/s). Forslag er kun råd; ingen kite (heller ikke tube) utelukkes. Valgt quiver vises i toppfeltet. |
+| **Snowkite-reisemodell** | *Dagplan* | Fremdrift langs ruten per etappe ut fra kurs mot vind (VMG i motvind/medvind), brukbar vind, le (DTM), gåstrekk (bratt + sluttnedstigning), oppskyting, navigasjon, værstans, tretthet og dagslys. Alle parametre kan endres. Scenario A/B/C. 3 dager er standardmålet. |
+| **Dagkort** | *Dagplan* | Start/slutt, distanse, kite-/ski-/overhead-/ventetid, dagslys igjen ved ankomst, høydeprofil, sjekkpunkter, foreslått + alternativ leir, nødutganger, notater. Dra sjekkpunkter mellom dager (eller ◀ ▶), dra 🏁 i kartet, 2–7 dager. |
+| **Notater på punkter** | Klikk rutepunkt/markør · «📝 Markør»-modus | Navn, kategori/ikon (13 innebygde + egne), beskrivelse, notater, lenker, bilder (nedskalert), status (uverifisert/advarsel/brukergodkjent/verifisert/blokkert), flytt rekkefølge, bruk som dagsslutt. Kategorier kan skjules i kartlag. |
+| **Kalender og sol** | *Kalender* | Velg avreise, antall dager, alternative datoer, ±1 dag. Soloppgang/-nedgang, borgerlig demring/skumring, gylden time og dagslys beregnes (SunCalc) for midtpunktet av hver dagsetappe, tidssone Europe/Oslo. |
+| **Vær** | *Vær & vind* | Vindpiler i kartet for hytter + delmål med tidsvelger (MET). Prognose per turdag vises bare når datoene er innenfor ~9 døgn. Effektiv temperatur og snø/regn beregnes. Klimatologi fra MET Frost (krever gratis klient-ID). |
+| **Sluttnedstigning** | *Sikkerhet* | Eget segment: Krossobanen-status, Ryes vei-vurdering (fall, helning, svinger og skredterreng målt fra ruten), alternativer. |
+| **Utstyr og offline** | *Utstyr & offline* | Pakkeliste med vekt, mat- og brenselkalkulator, nødpunkter, prosjektfil (JSON), GPX med notater, CSV, utskrivbar oversikt, nedlasting av kartfliser langs ruten (service worker). |
+| **Turoversikt + endringslogg** | Sidepanel · *Overstyringer* | Dato, dager, distanse, quiver, sjekkpunkter, leirplasser, uløste advarsler, aktive overstyringer, status. Logg over ruteendringer og overstyringer. |
+
+Kartfarger: rød = hovedrute, blå = alternativer, grønn ring = godkjent av deg, gul = advarsel, rød skravur = no-go, lilla = notater, turkis stiplet = USER OVERRIDE.
+
+### Begrensninger i v2
+- Ingen åpen kilde gir «verifisert uregulert vann» automatisk, så den klassen brukes ikke.
+- Produsentdata for kites er ikke hentet; egenskapene er merket som faglige vurderinger.
+- Nærmeste brøytede vei og mobildekning er ikke integrert (ingen åpen API med vinterstatus/dekning).
+- Klimatologi krever MET Frost-klient-ID. Sikt finnes ikke i Locationforecast (tåkeandel vises i stedet).
+- Offline-fliser fungerer etter at siden er åpnet én gang med nett. NVE/MET-data må hentes før avreise og lagres i prosjektfilen.
+- Dra-og-slipp av sjekkpunkter virker med mus; på mobil brukes ◀ ▶.
+
 ## Funn så langt (2026-11-03)
 
 | Funn | Status | Kilde |
@@ -48,7 +73,7 @@ Planen lagres automatisk i nettleseren (localStorage).
 | Krossobanen stanset av Statens jernbanetilsyn 19.06.2024, under istandsetting; kildene oppgir gjenåpning alt fra 2027 til 2028 | 🔴 Planlegg uten | Telemark fylkeskommune, TU.no, Komoot |
 | Ryes vei: ca. 4 km, ~500 høydemeter, 21 svinger, brukes som akebakke om vinteren – ingen kilde bekrefter at den egner seg for ski med pulk | 🟡 Sjekk selv | visitrjukan.com |
 | GPX-ruten er 113 km i rette linjer (opptil 11 km lange strekk) | 🟡 Faktisk distanse blir lengre | Beregnet |
-| Gjennomførbarhet: scenario A ≈ 2–3 dager, B ≈ 6, C ≈ 10 (inkl. liggedager) | 🟡 Tre dager er ambisiøst | Beregnet modell |
+| Snowkite-modell (v2) med vind fra NV på din GPX: scenario A ≈ 2–3 dager, B ≈ 3–4, C ≈ 7–8 | 🟡 Tre dager er realistisk med god, stabil vind | Beregnet modell |
 
 Reguleringshøydene er fra sekundærkilder og **må bekreftes i NVE Atlas**. Når NVE-dataene lastes i appen, vises
 NVEs egne attributter.
@@ -93,4 +118,4 @@ src/
 public/data/   din GPX
 ```
 
-Teknologi: React 18 + TypeScript + Vite, Leaflet, ECharts, Turf, Zustand.
+Teknologi: React 18 + TypeScript + Vite, Leaflet, ECharts, Turf, Zustand, SunCalc.

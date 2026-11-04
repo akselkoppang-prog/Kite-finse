@@ -34,17 +34,19 @@ export async function loadInitialGpx() {
   useStore.getState().set({ activeRouteId: route.id });
 }
 
+/** Importerer spor/ruter som NYE ruter og <wpt> som egne markører. Eksisterende data røres ikke. */
 export async function importGpxFile(file: File) {
   const xml = await file.text();
   const parsed = parseGpx(xml, `Importert GPX «${file.name}» ${now().slice(0, 10)}`);
   const st = useStore.getState();
+  let n = 0;
   parsed.tracks.forEach((t, i) => {
     if (t.points.length < 2) return;
     const r: Route = {
       id: uid('rt'),
       name: t.name || `${file.name} #${i + 1}`,
       kind: 'egen',
-      color: ['#f472b6', '#34d399', '#60a5fa', '#fbbf24'][i % 4],
+      color: '#3b82f6',
       description: `Importert fra ${file.name}`,
       waypoints: t.points,
       visible: true,
@@ -53,8 +55,27 @@ export async function importGpxFile(file: File) {
     };
     st.upsertRoute(r);
     useStore.getState().set({ activeRouteId: r.id });
+    n++;
   });
-  return parsed.tracks.length;
+  if (parsed.waypoints.length) {
+    const markers = parsed.waypoints.map((w) => ({
+      id: uid('mk'),
+      lat: w.lat,
+      lon: w.lon,
+      name: w.name ?? 'GPX-punkt',
+      category: w.category ?? 'note',
+      description: w.description,
+      notes: w.notes,
+      attachments: w.attachments,
+      source: w.source,
+      verification: 'uverifisert' as const,
+      createdAt: now(),
+      updatedAt: now(),
+    }));
+    useStore.getState().set({ markers: [...useStore.getState().markers, ...markers] });
+  }
+  useStore.getState().log('rute', `Importerte ${file.name}: ${n} spor, ${parsed.waypoints.length} punkter (eksisterende data beholdt)`);
+  return `Importerte ${n} spor og ${parsed.waypoints.length} punkter som nye elementer – ingenting eksisterende ble overskrevet.`;
 }
 
 export async function resolveAllPlaces(onMsg?: (m: string) => void) {
@@ -134,10 +155,20 @@ export async function runTerrainForActive(stepM: number, onProgress: (f: number)
   return res;
 }
 
-export function exportPlanJson(): string {
+const CACHE_KEYS = ['hydro', 'lakes', 'terrain'] as const;
+
+/** Hele prosjektet: ruter, notater, markører, overstyringer, kites, datoer, dagsplan, utstyr, historikk.
+ *  includeData=true tar også med NVE-/DTM-data for offline bruk. */
+export function exportPlanJson(includeData = true): string {
   const s = useStore.getState();
-  const { routes, zones, camps, places, userVerifiedLakes, checklist, timeline, acks, kiteOverrides, tripDate, windFrom, windSpeed, windGust } = s;
-  return JSON.stringify({ format: 'kite-finse-rjukan-plan', version: 1, exportedAt: now(), routes, zones, camps, places, userVerifiedLakes, checklist, timeline, acks, kiteOverrides, tripDate, windFrom, windSpeed, windGust }, null, 2);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(s)) {
+    if (typeof v === 'function') continue;
+    if (['focus', 'editMode', 'draftZone', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'windPoints', 'tab'].includes(k)) continue;
+    if (!includeData && (CACHE_KEYS as readonly string[]).includes(k)) continue;
+    out[k] = v;
+  }
+  return JSON.stringify({ format: 'kite-finse-rjukan-plan', version: 2, exportedAt: now(), ...out }, null, 2);
 }
 
 export function importPlanJson(txt: string) {
@@ -145,5 +176,7 @@ export function importPlanJson(txt: string) {
   if (j.format !== 'kite-finse-rjukan-plan') throw new Error('Ukjent filformat');
   const { format: _f, version: _v, exportedAt: _e, ...rest } = j;
   void _f; void _v; void _e;
-  useStore.getState().set({ ...rest, activeRouteId: rest.routes?.[0]?.id ?? null });
+  if (!Array.isArray(rest.routes)) throw new Error('Filen mangler ruter');
+  useStore.getState().set({ ...rest, activeRouteId: rest.activeRouteId ?? rest.routes?.[0]?.id ?? null });
+  useStore.getState().log('annet', `Åpnet prosjektfil (${rest.routes.length} ruter)`);
 }

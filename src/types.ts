@@ -6,8 +6,9 @@ import type { LatLon } from './lib/geo';
  *  GUL   – usikkerhet eller manglende opplysninger
  *  RØD   – kjent barriere, uakseptabel risiko eller forbudt i planen
  *  GRÅ   – ingen tilgjengelige data
+ *  BRUKER – din egen overstyring/godkjenning (IKKE uavhengig verifisert)
  */
-export type Status = 'GRØNN' | 'GUL' | 'RØD' | 'GRÅ';
+export type Status = 'GRØNN' | 'GUL' | 'RØD' | 'GRÅ' | 'BRUKER';
 
 /** Hvilken kategori en dataverdi tilhører – vises alltid i UI. */
 export type DataKind =
@@ -19,7 +20,30 @@ export type DataKind =
 
 export type WaypointKind = 'via' | 'stopp' | 'omvei' | 'delmål';
 
-export interface Waypoint extends LatLon {
+/** Brukerens egen vurdering av et punkt. «brukergodkjent» er ALDRI det samme som verifisert. */
+export type Verification = 'uverifisert' | 'advarsel' | 'brukergodkjent' | 'verifisert' | 'blokkert';
+
+export interface Attachment {
+  id: string;
+  name: string;
+  /** Lenke (https://…) eller nedskalert bilde som data-URL */
+  href: string;
+  kind: 'lenke' | 'bilde';
+  addedAt: string;
+}
+
+/** Felles notat-felter for rutepunkter og egne markører. */
+export interface Annotated {
+  category?: string;
+  description?: string;
+  notes?: string;
+  attachments?: Attachment[];
+  verification?: Verification;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Waypoint extends LatLon, Annotated {
   id: string;
   name?: string;
   kind: WaypointKind;
@@ -29,6 +53,14 @@ export interface Waypoint extends LatLon {
   source: string;
   dataKind: DataKind;
   note?: string;
+}
+
+/** Egen markør i kartet (ikke del av rutelinjen). */
+export interface Marker extends LatLon, Annotated {
+  id: string;
+  name: string;
+  category: string;
+  source: string;
 }
 
 export type RouteKind = 'gpx' | 'konsept' | 'alternativ' | 'egen';
@@ -43,6 +75,8 @@ export interface Route {
   visible: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Dagsskift som avstand (m) fra start. Lengde = antall dager − 1. */
+  dayBreaks?: number[];
 }
 
 export type ZoneKind = 'forbudt' | 'usikker';
@@ -61,6 +95,7 @@ export interface Camp extends LatLon {
   night: number;
   source: 'manuell' | 'beregnet kandidat';
   note?: string;
+  approved?: boolean;
 }
 
 export interface Place extends LatLon {
@@ -72,4 +107,52 @@ export interface Place extends LatLon {
   fetchedAt: string;
   /** Rolle i planen */
   role: ('hytte' | 'avbrudd' | 'by' | 'transport')[];
+}
+
+// ---------- Vann-overstyring (whitelist) ----------
+
+export type OverrideScope = 'permanent' | 'tur' | 'sesong';
+
+export interface LakeOverride {
+  id: string;
+  /** Stabil nøkkel for vannet (NVE-id eller navn). */
+  barrierKey: string;
+  name: string;
+  /** Opprinnelig klassifisering ved overstyring – endres aldri av overstyringen. */
+  originalKind: 'magasin' | 'innsjø';
+  originalLabel: string;
+  centroid: LatLon;
+  /** GeoJSON-geometri (polygon) slik den var da overstyringen ble laget */
+  geometry?: unknown;
+  scope: OverrideScope;
+  /** Sesong: gyldig mellom disse (MM-DD) hvert år */
+  seasonFrom?: string;
+  seasonTo?: string;
+  /** Tur: gjelder kun turdatoene (lagres som avreisedato) */
+  tripDate?: string;
+  expires?: string;
+  reviewRequired: boolean;
+  reviewedAt?: string;
+  note: string;
+  sourceLink?: string;
+  /** Hvilken rute og strekning (km) den gjelder. Tom = alle kryssinger av vannet. */
+  segment?: { routeId: string; routeName: string; fromKm: number; toKm: number };
+  createdAt: string;
+  active: boolean;
+}
+
+export interface HistoryEntry {
+  at: string;
+  kind: 'rute' | 'overstyring' | 'kite' | 'dato' | 'annet';
+  text: string;
+}
+
+export interface Quiver {
+  id: string;
+  name: string;
+  kiteIds: string[];
+  primary?: string;
+  secondary?: string;
+  storm?: string;
+  note?: string;
 }

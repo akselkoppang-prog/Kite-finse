@@ -52,8 +52,8 @@ export default function RoutePanel() {
         </div>
         <div className="btns">
           <button className="btn" onClick={() => gpxIn.current?.click()}>Importer GPX</button>
-          <button className="btn" disabled={!route} onClick={() => route && download(`${route.name.replace(/\W+/g, '_')}.gpx`, toGpx([route], s.camps))}>Eksporter aktiv GPX</button>
-          <button className="btn" onClick={() => download('finse-rjukan-alle-ruter.gpx', toGpx(s.routes.filter((r) => r.visible), s.camps))}>Eksporter alle</button>
+          <button className="btn" disabled={!route} onClick={() => route && download(`${route.name.replace(/\W+/g, '_')}.gpx`, toGpx([route], s.camps, s.markers))}>Eksporter aktiv GPX</button>
+          <button className="btn" onClick={() => download('finse-rjukan-alle-ruter.gpx', toGpx(s.routes.filter((r) => r.visible), s.camps, s.markers))}>Eksporter alle</button>
           <button className="btn" disabled={!route} onClick={() => route && s.duplicateRoute(route.id)}>Dupliser til redigerbar kopi</button>
           <button className="btn danger" disabled={!route} onClick={() => route && confirm(`Slette «${route.name}»?`) && s.removeRoute(route.id)}>Slett</button>
         </div>
@@ -62,7 +62,7 @@ export default function RoutePanel() {
           <button className="btn ghost" onClick={() => jsonIn.current?.click()}>Åpne plan</button>
         </div>
         <p className="muted small">Planen lagres automatisk i nettleseren (localStorage). Bruk «Lagre plan» for sikkerhetskopi / deling.</p>
-        <input ref={gpxIn} type="file" accept=".gpx,application/gpx+xml" hidden onChange={(e) => e.target.files?.[0] && run('GPX-import', async () => `Importerte ${await importGpxFile(e.target.files![0])} spor`)} />
+        <input ref={gpxIn} type="file" accept=".gpx,application/gpx+xml" hidden onChange={(e) => e.target.files?.[0] && run('GPX-import', async () => importGpxFile(e.target.files![0]))} />
         <input
           ref={jsonIn}
           type="file"
@@ -136,18 +136,21 @@ export default function RoutePanel() {
           {check.crossings.length === 0 && check.waterChecked && <p className="ok small">Ingen kryssinger av kjente vann/soner funnet i NVE-data for denne ruteversjonen.</p>}
           {check.crossings.map((c, i) => (
             <div key={i} className="cross">
-              <Badge s={c.barrier.status} /> <b>{c.barrier.name}</b> · {Math.round(c.lengthM)} m ved {fmtKm(c.fromD)}
-              <div className="small muted">{c.barrier.label}</div>
+              <Badge s={c.blocking ? 'RØD' : c.label === 'BRUKERGODKJENT' ? 'BRUKER' : 'GUL'}>{c.label}</Badge> <b>{c.barrier.name}</b> · {Math.round(c.lengthM)} m ved {fmtKm(c.fromD)}
+              <div className="small muted">{c.barrier.label}{c.override ? ` · overstyring: ${c.overrideState}` : ''}</div>
+              {c.hazards.map((h) => <div key={h} className="small err">⚠️ {h}</div>)}
               <div className="btns">
                 <button className="btn small" onClick={() => s.focusOn(c.entry.lat, c.entry.lon, 13)}>Vis</button>
+                {c.barrier.kind !== 'sone' && <button className="btn small" onClick={() => s.set({ selectedBarrier: c.barrier.id, selectedWp: null, selectedMarker: null })}>Detaljer / whitelist</button>}
                 <button
                   className="btn small"
                   onClick={() => {
                     const nw = detourAround(route.waypoints, c.barrier);
                     if (!nw) return setMsg('Kunne ikke beregne omvei (start/slutt inne i barriere eller ugyldig geometri).');
-                    const copy = { ...route, id: uid('rt'), name: `${route.name} + omvei ${c.barrier.name}`, kind: 'egen' as const, color: '#34d399', waypoints: nw, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+                    const copy = { ...route, id: uid('rt'), name: `${route.name} + omvei ${c.barrier.name}`, kind: 'egen' as const, color: '#3b82f6', waypoints: nw, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
                     s.upsertRoute(copy);
                     s.set({ activeRouteId: copy.id });
+                    s.log('rute', `Laget omvei rundt ${c.barrier.name} som ny rute «${copy.name}»`);
                     setMsg(`Laget ny rute med beregnet omvei rundt ${c.barrier.name}. Kjør steg 3 og 4 på nytt for den nye ruten.`);
                   }}
                 >
@@ -180,6 +183,7 @@ export default function RoutePanel() {
               ['insert', '+ Punkt (sett inn)'],
               ['zone', 'Tegn sone'],
               ['camp', '⛺ Teltplass'],
+              ['marker', '📝 Markør'],
             ] as const
           ).map(([m, l]) => (
             <button key={m} className={`btn small ${s.editMode === m ? 'on' : ''}`} onClick={() => s.set({ editMode: m, draftZone: m === 'zone' ? s.draftZone : [] })}>
@@ -187,7 +191,7 @@ export default function RoutePanel() {
             </button>
           ))}
         </div>
-        <p className="muted small">Dra punkter for å flytte. Klikk punkt → slett. GPX-ruten: dupliser først hvis du vil beholde originalen.</p>
+        <p className="muted small">Dra punkter for å flytte. Klikk et punkt eller en markør for å redigere navn, kategori, beskrivelse, notater, bilder og status. Klikk et vann for detaljer og whitelist. GPX-ruten: dupliser først hvis du vil beholde originalen.</p>
         {s.editMode === 'zone' && (
           <div className="zone-form">
             <span className="small">{s.draftZone.length} hjørner klikket</span>

@@ -48,7 +48,7 @@ export function defaultWindow(k: Kite, totalKg: number, snow: Snow, terrain: Ter
 export interface KiteVerdict {
   kite: Kite;
   window: KiteWindow;
-  status: 'aktuell' | 'grensetilfelle' | 'for lite trekk' | 'overpower' | 'frarådet';
+  status: 'aktuell' | 'grensetilfelle' | 'for lite trekk' | 'overpower';
   score: number;
   reasons: string[];
 }
@@ -87,9 +87,8 @@ export function evaluate(kites: Kite[], input: KiteInput, overrides: Record<stri
         reasons.push(`Kurs ${Math.round(input.courseAngle)}° mot vinden: upwind-evne vektlegges (faglig vurdering ${Math.round(k.upwind * 100)} %).`);
       }
       if (k.type === 'tube (LEI)') {
-        score -= 0.3;
-        reasons.push('Tube-kite: pumpe, kulde og vekt – frarådet på ekspedisjon.');
-        if (status === 'aktuell') status = 'frarådet';
+        score -= 0.1;
+        reasons.push('Tube-kite: husk pumpe, kulde (stive blærer) og ekstra vekt – vurdering, ikke utelukkelse.');
       }
       if (k.type === 'åpen-celle foil' && gustRatio > 1.5) reasons.push('Åpen-celle kan kollapse i turbulens – fly unna lefronter.');
       if (status === 'for lite trekk' || status === 'overpower') score = Math.min(score, 0) - 1;

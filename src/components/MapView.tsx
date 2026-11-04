@@ -2,26 +2,21 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore } from '../state/store';
-import { useActiveRoute, useBarrierCheck, useTerrain, useWind } from '../state/derived';
+import { useActiveRoute, useBarrierCheck, useDayPlan, useTerrain, useWind } from '../state/derived';
 import { SOURCES } from '../data/sources';
-import { fmtCoord, fmtDM, uid } from '../lib/geo';
+import { fmtCoord, fmtDM, nearestOnRoute, uid, cumulative, pointAt } from '../lib/geo';
 import { classify } from '../lib/analysis/terrain';
 import { scoreColor } from '../lib/analysis/wind';
 import { subgoals } from '../lib/subgoals';
 import { featureName } from '../lib/api/nve';
+import { categoryOf } from '../data/categories';
+import { cachedTileLayer } from '../lib/offline';
 
-const STATUS_COLOR = { GRØNN: '#22c55e', GUL: '#eab308', RØD: '#ef4444', GRÅ: '#94a3b8' } as const;
+export const STATUS_COLOR = { GRØNN: '#22c55e', GUL: '#eab308', RØD: '#ef4444', GRÅ: '#94a3b8', BRUKER: '#2dd4bf' } as const;
+export const ROUTE_RED = '#ef4444';
+export const ALT_BLUE = '#3b82f6';
 
 const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]!);
-
-function propsTable(p: Record<string, unknown> | undefined) {
-  if (!p) return '';
-  return `<table class="ptable">${Object.entries(p)
-    .filter(([k, v]) => v != null && v !== '' && !k.startsWith('__') && !/shape|globalid/i.test(k))
-    .slice(0, 18)
-    .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(String(v))}</td></tr>`)
-    .join('')}</table>`;
-}
 
 export default function MapView() {
   const el = useRef<HTMLDivElement>(null);
@@ -35,14 +30,15 @@ export default function MapView() {
   const check = useBarrierCheck(route);
   const terrain = useTerrain(route);
   const wind = useWind(route);
+  const plan = useDayPlan(route);
 
   // --- init ---
   useEffect(() => {
     if (!el.current || map.current) return;
-    const m = L.map(el.current, { zoomControl: true, preferCanvas: false }).setView([60.2, 8.0], 9);
+    const m = L.map(el.current, { zoomControl: true }).setView([60.2, 8.0], 9);
     L.control.scale({ imperial: false }).addTo(m);
     map.current = m;
-    ['zones', 'water', 'wms', 'alts', 'route', 'wind', 'steep', 'cross', 'places', 'camps', 'sub', 'draft'].forEach((k) => (groups.current[k] = L.layerGroup().addTo(m)));
+    ['zones', 'water', 'alts', 'route', 'wind', 'steep', 'cross', 'places', 'camps', 'sub', 'markers', 'breaks', 'arrows', 'draft'].forEach((k) => (groups.current[k] = L.layerGroup().addTo(m)));
     const coordBox = new L.Control({ position: 'bottomleft' });
     coordBox.onAdd = () => {
       const d = L.DomUtil.create('div', 'coordbox');
@@ -57,13 +53,13 @@ export default function MapView() {
     return () => ro.disconnect();
   }, []);
 
-  // --- base layer ---
+  // --- base layer (med offline-cache via service worker) ---
   useEffect(() => {
     const m = map.current;
     if (!m) return;
     const id = s.layers.base === 'topo' ? 'kv-topo' : s.layers.base === 'graatone' ? 'kv-graatone' : 'kv-raster';
     baseLayer.current?.remove();
-    baseLayer.current = L.tileLayer(SOURCES[id].urls[0], { maxZoom: 18, attribution: '© <a href="https://www.kartverket.no/">Kartverket</a> (CC BY 4.0)' }).addTo(m);
+    baseLayer.current = cachedTileLayer(SOURCES[id].urls[0], { maxZoom: 18, attribution: '© <a href="https://www.kartverket.no/">Kartverket</a> (CC BY 4.0)' }).addTo(m);
     baseLayer.current.bringToBack();
   }, [s.layers.base]);
 
@@ -72,14 +68,14 @@ export default function MapView() {
     const m = map.current;
     if (!m) return;
     const conf = [
-      { key: 'nve', on: s.layers.nveWms, cfg: s.wms.nve, attr: '© NVE' },
-      { key: 'skred', on: s.layers.skredWms, cfg: s.wms.skred, attr: '© NVE' },
+      { key: 'nve', on: s.layers.nveWms, cfg: s.wms.nve },
+      { key: 'skred', on: s.layers.skredWms, cfg: s.wms.skred },
     ];
-    conf.forEach(({ key, on, cfg, attr }) => {
+    conf.forEach(({ key, on, cfg }) => {
       wmsLayers.current[key]?.remove();
       wmsLayers.current[key] = undefined;
       if (on && cfg.url && cfg.layers) {
-        wmsLayers.current[key] = L.tileLayer.wms(cfg.url, { layers: cfg.layers, format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.65, attribution: attr }).addTo(m);
+        wmsLayers.current[key] = L.tileLayer.wms(cfg.url, { layers: cfg.layers, format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.65, attribution: '© NVE' }).addTo(m);
       }
     });
   }, [s.layers.nveWms, s.layers.skredWms, s.wms]);
@@ -98,6 +94,11 @@ export default function MapView() {
       else if (st.editMode === 'camp') {
         const night = Math.max(1, ...st.camps.map((c) => c.night));
         st.set({ camps: [...st.camps, { id: uid('camp'), lat, lon: lng, name: `Teltplass ${st.camps.length + 1}`, night, source: 'manuell' }] });
+      } else if (st.editMode === 'marker') {
+        const id = uid('mk');
+        const now = new Date().toISOString();
+        st.set({ markers: [...st.markers, { id, lat, lon: lng, name: `Notat ${st.markers.length + 1}`, category: 'note', source: 'Klikket i kart', verification: 'uverifisert', createdAt: now, updatedAt: now }], selectedMarker: id, selectedWp: null, selectedBarrier: null });
+        st.log('rute', `La til markør ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
       }
     };
     m.on('click', onClick);
@@ -112,7 +113,6 @@ export default function MapView() {
     if (s.focus && map.current) map.current.flyTo([s.focus.lat, s.focus.lon], s.focus.zoom ?? Math.max(map.current.getZoom(), 13), { duration: 0.8 });
   }, [s.focus]);
 
-  // --- fit to route first time ---
   const fitted = useRef(false);
   useEffect(() => {
     if (!fitted.current && route && route.waypoints.length > 1 && map.current) {
@@ -121,7 +121,7 @@ export default function MapView() {
     }
   }, [route]);
 
-  // --- water layers ---
+  // --- vann: magasiner, innsjøer, dammer ---
   useEffect(() => {
     const g = groups.current.water;
     if (!g) return;
@@ -131,17 +131,21 @@ export default function MapView() {
       .forEach((b) => {
         if (b.kind === 'magasin' && !s.layers.reservoirs) return;
         if (b.kind === 'innsjø' && !s.layers.lakes) return;
-        const color = STATUS_COLOR[b.status];
-        L.geoJSON(b.feature as never, {
-          style: { color, weight: b.kind === 'magasin' ? 2.5 : 1.5, fillColor: color, fillOpacity: b.kind === 'magasin' ? 0.28 : 0.18, dashArray: b.kind === 'innsjø' ? '4 3' : undefined },
+        const over = check.activeOverrideKeys.has(b.id);
+        const color = over ? STATUS_COLOR.BRUKER : STATUS_COLOR[b.status];
+        const lyr = L.geoJSON(b.feature as never, {
+          style: { color, weight: over ? 3 : b.kind === 'magasin' ? 2.5 : 1.5, fillColor: color, fillOpacity: b.kind === 'magasin' ? 0.28 : 0.18, dashArray: over ? '2 6' : b.kind === 'innsjø' ? '4 3' : undefined },
         })
-          .bindPopup(
-            `<b>${esc(b.name)}</b><br/><span class="pill" style="background:${color}">${b.status}</span> ${esc(b.label)}<br/>` +
-              (b.hrv != null || b.lrv != null ? `HRV: ${b.hrv ?? '–'} moh · LRV: ${b.lrv ?? '–'} moh<br/>` : 'HRV/LRV: ikke tilgjengelig i data<br/>') +
-              `<small>Kilde: ${esc(b.source)}</small>${propsTable(b.props)}`,
-            { maxWidth: 360 },
-          )
+          .bindTooltip(`<b>${esc(b.name)}</b><br/>${over ? '<b>USER OVERRIDE</b> – ' : ''}${esc(b.label)}<br/><i>Klikk for detaljer og overstyring</i>`, { sticky: true })
+          .on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            useStore.getState().set({ selectedBarrier: b.id, selectedWp: null, selectedMarker: null });
+          })
           .addTo(g);
+        if (over) {
+          const c = lyr.getBounds().getCenter();
+          L.marker(c, { icon: L.divIcon({ className: '', html: '<div class="override-tag">✋ USER OVERRIDE</div>', iconSize: [110, 20], iconAnchor: [55, 10] }), interactive: false }).addTo(g);
+        }
       });
     (s.hydro?.dams ?? []).forEach((d) => {
       if (!s.layers.reservoirs) return;
@@ -149,12 +153,12 @@ export default function MapView() {
         pointToLayer: (_f, ll) => L.circleMarker(ll, { radius: 5, color: '#fff', weight: 1, fillColor: '#0ea5e9', fillOpacity: 1 }),
         style: { color: '#0ea5e9', weight: 2 },
       })
-        .bindPopup(`<b>Dam: ${esc(featureName(d.properties) ?? 'uten navn')}</b><br/><small>Kilde: NVE Vannkraft</small>${propsTable(d.properties)}`)
+        .bindPopup(`<b>Dam: ${esc(featureName(d.properties) ?? 'uten navn')}</b><br/><small>Kilde: NVE Vannkraft. Farer ved dammer kan ikke overstyres.</small>`)
         .addTo(g);
     });
-  }, [check.barriers, s.layers.reservoirs, s.layers.lakes, s.hydro]);
+  }, [check.barriers, check.activeOverrideKeys, s.layers.reservoirs, s.layers.lakes, s.hydro]);
 
-  // --- zones ---
+  // --- soner (forbudt = rød skravur) ---
   useEffect(() => {
     const g = groups.current.zones;
     const dg = groups.current.draft;
@@ -163,9 +167,10 @@ export default function MapView() {
     dg.clearLayers();
     if (s.layers.zones)
       s.zones.forEach((z) => {
-        const c = z.kind === 'forbudt' ? '#ef4444' : '#eab308';
-        L.polygon(z.ring.map((p) => [p.lat, p.lon]), { color: c, weight: 2, dashArray: '6 4', fillOpacity: 0.2 })
-          .bindPopup(`<b>${esc(z.name)}</b><br/>${z.kind === 'forbudt' ? 'Forbudt sone (RØD)' : 'Usikker sone (GUL)'}<br/><small>${esc(z.note ?? '')}</small>`)
+        const nogo = z.kind === 'forbudt';
+        const c = nogo ? '#ef4444' : '#eab308';
+        L.polygon(z.ring.map((p) => [p.lat, p.lon]), { color: c, weight: 2, dashArray: '6 4', fillOpacity: nogo ? 0.9 : 0.2, className: nogo ? 'zone-nogo' : '' })
+          .bindPopup(`<b>${esc(z.name)}</b><br/>${nogo ? 'Forbudt sone – BLOKKERT (kan ikke overstyres)' : 'Usikker sone (advarsel)'}<br/><small>${esc(z.note ?? '')}</small>`)
           .addTo(g);
       });
     if (s.draftZone.length) {
@@ -174,7 +179,7 @@ export default function MapView() {
     }
   }, [s.zones, s.draftZone, s.layers.zones]);
 
-  // --- alternative routes ---
+  // --- alternative ruter (blå) ---
   useEffect(() => {
     const g = groups.current.alts;
     if (!g) return;
@@ -183,14 +188,17 @@ export default function MapView() {
     s.routes
       .filter((r) => r.id !== s.activeRouteId && r.visible)
       .forEach((r) => {
-        L.polyline(r.waypoints.map((w) => [w.lat, w.lon]), { color: r.color, weight: 3, opacity: 0.75, dashArray: '8 6' })
-          .bindTooltip(`${esc(r.name)} – FORESLÅTT, ikke verifisert (klikk for å aktivere)`, { sticky: true })
-          .on('click', () => useStore.getState().set({ activeRouteId: r.id }))
+        L.polyline(r.waypoints.map((w) => [w.lat, w.lon]), { color: ALT_BLUE, weight: 3, opacity: 0.8, dashArray: '8 6' })
+          .bindTooltip(`Alternativ: ${esc(r.name)} – FORESLÅTT, ikke verifisert (klikk for å gjøre til hovedrute)`, { sticky: true })
+          .on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            useStore.getState().set({ activeRouteId: r.id });
+          })
           .addTo(g);
       });
   }, [s.routes, s.activeRouteId, s.layers.alternatives]);
 
-  // --- active route + markers ---
+  // --- hovedrute (rød) + punkter ---
   useEffect(() => {
     const g = groups.current.route;
     const sg = groups.current.sub;
@@ -200,47 +208,94 @@ export default function MapView() {
     if (!route || !s.layers.routes) return;
     const line = route.waypoints.map((w) => [w.lat, w.lon] as [number, number]);
     L.polyline(line, { color: '#0b1220', weight: 7, opacity: 0.6 }).addTo(g);
-    L.polyline(line, { color: route.color, weight: 4, dashArray: route.kind === 'gpx' ? undefined : '10 6' })
-      .bindTooltip(`${esc(route.name)} – FORESLÅTT RUTE, ikke verifisert i terrenget`, { sticky: true })
+    L.polyline(line, { color: ROUTE_RED, weight: 4, dashArray: route.kind === 'gpx' ? undefined : '10 6' })
+      .bindTooltip(`Hovedrute: ${esc(route.name)} – FORESLÅTT, ikke verifisert i terrenget`, { sticky: true })
       .addTo(g);
     const many = route.waypoints.length > 60;
     route.waypoints.forEach((w, i) => {
+      const cat = categoryOf(w.category, s.customCategories);
+      if (cat && s.hiddenCategories.includes(cat.id)) return;
       const named = !!w.name;
       const isEnd = i === 0 || i === route.waypoints.length - 1;
       const sel = s.selectedWp === w.id;
-      const size = named || isEnd ? 14 : many ? 7 : 10;
-      const cls = `wp ${w.kind} ${named ? 'named' : ''} ${sel ? 'sel' : ''} ${w.dataKind}`;
-      const icon = L.divIcon({ className: '', html: `<div class="${cls}" style="width:${size}px;height:${size}px;border-color:${route.color}"></div>${named ? `<div class="wplabel">${esc(w.name!)}</div>` : ''}`, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
-      const mk = L.marker([w.lat, w.lon], { icon, draggable: true, autoPan: true });
+      const approved = w.verification === 'brukergodkjent';
+      let html: string;
+      let size: number;
+      if (cat) {
+        size = 26;
+        html = `<div class="catpin ${sel ? 'sel' : ''} ${approved ? 'approved' : ''}" style="border-color:${cat.color}">${cat.icon}</div>${named ? `<div class="wplabel">${esc(w.name!)}</div>` : ''}`;
+      } else {
+        size = named || isEnd ? 14 : many ? 7 : 10;
+        html = `<div class="wp ${w.kind} ${sel ? 'sel' : ''} ${approved ? 'approved' : ''} ${w.dataKind}" style="width:${size}px;height:${size}px;border-color:${ROUTE_RED}"></div>${named ? `<div class="wplabel">${esc(w.name!)}</div>` : ''}`;
+      }
+      const mk = L.marker([w.lat, w.lon], { icon: L.divIcon({ className: '', html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] }), draggable: true, autoPan: true });
       mk.on('dragend', () => {
         const ll = mk.getLatLng();
         useStore.getState().moveWaypoint(route.id, w.id, ll.lat, ll.lng);
       });
-      mk.on('click', () => useStore.getState().set({ selectedWp: w.id }));
-      mk.bindPopup(() => {
-        const d = document.createElement('div');
-        d.innerHTML = `<b>${esc(w.name ?? `Punkt ${i + 1}`)}</b><br/>${fmtCoord(w)}<br/>${fmtDM(w)}<br/>Høyde (GPX/Garmin): ${w.eleGpx != null ? `${Math.round(w.eleGpx)} moh` : '–'}<br/><small>Type: ${w.kind} · ${w.dataKind}<br/>Kilde: ${esc(w.source)}</small><br/>`;
-        const del = document.createElement('button');
-        del.textContent = 'Slett punkt';
-        del.className = 'btn small danger';
-        del.onclick = () => {
-          useStore.getState().deleteWaypoint(route.id, w.id);
-          map.current?.closePopup();
-        };
-        d.appendChild(del);
-        return d;
+      mk.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        useStore.getState().set({ selectedWp: w.id, selectedMarker: null, selectedBarrier: null });
       });
+      if (w.description || w.notes) mk.bindTooltip(`<b>${esc(w.name ?? `Punkt ${i + 1}`)}</b><br/>${esc((w.description ?? w.notes ?? '').slice(0, 140))}`);
       mk.addTo(g);
     });
     subgoals(route).forEach((sgp) => {
       if (sgp.idx === 0) return;
-      L.marker([sgp.lat, sgp.lon], { icon: L.divIcon({ className: '', html: `<div class="subgoal"><span>${sgp.idx}</span></div>`, iconSize: [22, 22], iconAnchor: [11, 30] }), interactive: true, zIndexOffset: -100 })
+      L.marker([sgp.lat, sgp.lon], { icon: L.divIcon({ className: '', html: `<div class="subgoal"><span>${sgp.idx}</span></div>`, iconSize: [22, 22], iconAnchor: [11, 30] }), zIndexOffset: -100 })
         .bindTooltip(`Delmål ${sgp.idx}: ${esc(sgp.name)} · ${(sgp.d / 1000).toFixed(1)} km`)
         .addTo(sg);
     });
-  }, [route, s.layers.routes, s.selectedWp]);
+  }, [route, s.layers.routes, s.selectedWp, s.customCategories, s.hiddenCategories]);
 
-  // --- wind coloring ---
+  // --- egne markører (lilla) ---
+  useEffect(() => {
+    const g = groups.current.markers;
+    if (!g) return;
+    g.clearLayers();
+    if (!s.layers.markers) return;
+    s.markers.forEach((m) => {
+      const cat = categoryOf(m.category, s.customCategories);
+      if (s.hiddenCategories.includes(m.category)) return;
+      const approved = m.verification === 'brukergodkjent';
+      const html = `<div class="catpin marker ${s.selectedMarker === m.id ? 'sel' : ''} ${approved ? 'approved' : ''}" style="border-color:${cat?.color ?? '#a855f7'}">${cat?.icon ?? '📝'}</div><div class="wplabel">${esc(m.name)}</div>`;
+      const mk = L.marker([m.lat, m.lon], { draggable: true, icon: L.divIcon({ className: '', html, iconSize: [26, 26], iconAnchor: [13, 13] }) });
+      mk.on('dragend', () => {
+        const ll = mk.getLatLng();
+        const st = useStore.getState();
+        st.set({ markers: st.markers.map((x) => (x.id === m.id ? { ...x, lat: ll.lat, lon: ll.lng, updatedAt: new Date().toISOString() } : x)) });
+      });
+      mk.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        useStore.getState().set({ selectedMarker: m.id, selectedWp: null, selectedBarrier: null });
+      });
+      if (m.description) mk.bindTooltip(`<b>${esc(m.name)}</b><br/>${esc(m.description.slice(0, 140))}`);
+      mk.addTo(g);
+    });
+  }, [s.markers, s.layers.markers, s.selectedMarker, s.customCategories, s.hiddenCategories]);
+
+  // --- dagsskift (dra langs ruten) ---
+  useEffect(() => {
+    const g = groups.current.breaks;
+    if (!g) return;
+    g.clearLayers();
+    if (!route || !s.layers.dayBreaks) return;
+    const cum = cumulative(route.waypoints);
+    plan.breaks.forEach((d, i) => {
+      const p = pointAt(route.waypoints, cum, d);
+      const mk = L.marker([p.lat, p.lon], { draggable: true, zIndexOffset: 500, icon: L.divIcon({ className: '', html: `<div class="daybreak">🏁 Slutt dag ${i + 1}</div>`, iconSize: [96, 22], iconAnchor: [8, 22] }) });
+      mk.on('dragend', () => {
+        const ll = mk.getLatLng();
+        const near = nearestOnRoute(route.waypoints, { lat: ll.lat, lon: ll.lng });
+        const nb = [...plan.breaks];
+        nb[i] = near.d;
+        useStore.getState().setDayBreaks(route.id, nb);
+      });
+      mk.bindTooltip(`Dagsskift ${i + 1} ved ${(d / 1000).toFixed(1)} km – dra langs ruten for å flytte`).addTo(g);
+    });
+  }, [route, plan.breaks, s.layers.dayBreaks]);
+
+  // --- vind-egnethet ---
   useEffect(() => {
     const g = groups.current.wind;
     if (!g) return;
@@ -253,7 +308,24 @@ export default function MapView() {
     });
   }, [wind, s.layers.windColor, s.windFrom]);
 
-  // --- steep / terrain flags ---
+  // --- vindpiler fra MET-prognose ---
+  useEffect(() => {
+    const g = groups.current.arrows;
+    if (!g) return;
+    g.clearLayers();
+    if (!s.layers.windArrows) return;
+    s.windPoints.forEach((wp) => {
+      const row = wp.fc.rows[Math.min(s.forecastHour, wp.fc.rows.length - 1)];
+      if (!row || row.windFrom == null) return;
+      const to = (row.windFrom + 180) % 360;
+      const html = `<div class="windarrow"><div class="arr" style="transform:rotate(${to}deg)">➤</div><div class="wlbl">${row.windSpeed?.toFixed(0) ?? '–'}<small>/${row.windGust?.toFixed(0) ?? '–'}</small></div></div>`;
+      L.marker([wp.lat, wp.lon], { icon: L.divIcon({ className: '', html, iconSize: [44, 44], iconAnchor: [22, 22] }), interactive: true })
+        .bindTooltip(`<b>${esc(wp.label)}</b><br/>${new Date(row.time).toLocaleString('nb-NO', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}<br/>Vind ${row.windSpeed} m/s (kast ${row.windGust ?? '–'}) fra ${Math.round(row.windFrom)}°<br/>${row.temp}°C<br/><i>MET-prognose for punktet (modellgitter) – ikke måling</i>`)
+        .addTo(g);
+    });
+  }, [s.windPoints, s.forecastHour, s.layers.windArrows]);
+
+  // --- bratt / terreng ---
   useEffect(() => {
     const g = groups.current.steep;
     if (!g) return;
@@ -270,14 +342,19 @@ export default function MapView() {
     });
   }, [terrain, s.layers.steep]);
 
-  // --- crossings ---
+  // --- kryssinger ---
   useEffect(() => {
     const g = groups.current.cross;
     if (!g) return;
     g.clearLayers();
     check.crossings.forEach((c) => {
-      L.polyline([[c.entry.lat, c.entry.lon], [c.exit.lat, c.exit.lon]], { color: '#ff0040', weight: 10, opacity: 0.9 })
-        .bindTooltip(`KRYSSING: ${esc(c.barrier.name)} (${Math.round(c.lengthM)} m)<br/>${esc(c.barrier.label)}`, { sticky: true })
+      const color = c.blocking ? '#ff0040' : c.label === 'BRUKERGODKJENT' ? STATUS_COLOR.BRUKER : '#eab308';
+      L.polyline([[c.entry.lat, c.entry.lon], [c.exit.lat, c.exit.lon]], { color, weight: 10, opacity: 0.9 })
+        .bindTooltip(`${c.label}: ${esc(c.barrier.name)} (${Math.round(c.lengthM)} m)<br/>${esc(c.barrier.label)}${c.hazards.length ? `<br/>⚠️ ${esc(c.hazards.join('; '))}` : ''}`, { sticky: true })
+        .on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          useStore.getState().set({ selectedBarrier: c.barrier.id, selectedWp: null, selectedMarker: null });
+        })
         .addTo(g);
     });
     check.bandWarnings.forEach((w) => {
@@ -287,7 +364,7 @@ export default function MapView() {
     });
   }, [check.crossings, check.bandWarnings]);
 
-  // --- places ---
+  // --- steder ---
   useEffect(() => {
     const g = groups.current.places;
     if (!g) return;
@@ -301,20 +378,20 @@ export default function MapView() {
     });
   }, [s.places, s.layers.places]);
 
-  // --- camps ---
+  // --- teltplasser ---
   useEffect(() => {
     const g = groups.current.camps;
     if (!g) return;
     g.clearLayers();
     if (!s.layers.camps) return;
     s.camps.forEach((c) => {
-      const mk = L.marker([c.lat, c.lon], { draggable: true, icon: L.divIcon({ className: '', html: `<div class="camp">⛺<span>N${c.night}</span></div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) });
+      const mk = L.marker([c.lat, c.lon], { draggable: true, icon: L.divIcon({ className: '', html: `<div class="camp ${c.approved ? 'approved' : ''}">⛺<span>N${c.night}${c.approved ? ' ✓' : ''}</span></div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) });
       mk.on('dragend', () => {
         const ll = mk.getLatLng();
         const st = useStore.getState();
         st.set({ camps: st.camps.map((x) => (x.id === c.id ? { ...x, lat: ll.lat, lon: ll.lng, source: 'manuell' } : x)) });
       });
-      mk.bindTooltip(`${esc(c.name)} – natt ${c.night} (${c.source}). IKKE befart. Se Dagplan for vurdering.`).addTo(g);
+      mk.bindTooltip(`${esc(c.name)} – natt ${c.night} (${c.source}). ${c.approved ? 'Brukergodkjent (ikke befart av verktøyet).' : 'IKKE befart.'}`).addTo(g);
     });
   }, [s.camps, s.layers.camps]);
 

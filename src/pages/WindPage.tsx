@@ -6,6 +6,7 @@ import { forecast, type Forecast } from '../lib/api/met';
 import { scoreColor } from '../lib/analysis/wind';
 import { Card, Kind, Stat, fmtTime } from '../components/ui';
 import { useRouteMetrics } from '../components/CompareTable';
+import { WindMapControls, TripForecast, Climatology } from '../components/WeatherExtras';
 
 const DIR_TEXT: Record<Dir8, string> = {
   N: 'Nordavind: ruten går hovedsakelig sørøstover → mest slør/medvind. Kald luft, ofte god sikt etter frontpassasje. Lesider sør for rygger.',
@@ -62,6 +63,10 @@ export default function WindPage() {
         <p className="small">{DIR_TEXT[s.windFrom]}</p>
         <p className="muted small"><Kind k="sjekk-selv" /> Tekst over er faglig vurdering av typiske mønstre, ikke prognose.</p>
       </Card>
+
+      <WindMapControls />
+      <TripForecast />
+      <Climatology />
 
       <div className="grid4">
         <Stat label="Gunstig kurs" value={`${Math.round(summary.good * 100)} %`} sub="av distansen (slør/bredslør)" />
@@ -121,7 +126,7 @@ export default function WindPage() {
         <p className="muted small">En gunstig vindretning gjør ikke en rute trygg. Se Sikkerhet.</p>
       </Card>
 
-      <Card title="Værprognose (MET Norge – Locationforecast)" right={<button className="btn small" onClick={loadForecast} disabled={loading || !route}>{loading ? 'Henter…' : 'Hent prognose nå'}</button>} className="wide">
+      <Card title="Prognose i dag langs ruten (MET Locationforecast)" right={<button className="btn small" onClick={loadForecast} disabled={loading || !route}>{loading ? 'Henter…' : 'Hent prognose nå'}</button>} className="wide">
         <p className="small warn">
           Dette er dagens prognose (~9 døgn frem), IKKE for turen i mars/april 2027. Brukes til å teste verktøyet og i ukene før avreise. Vindkast og percentiler (P10/P90) viser prognoseusikkerhet.
         </p>

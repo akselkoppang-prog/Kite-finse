@@ -3,6 +3,8 @@ import { useAcceptance } from './SafetyPage';
 import { Badge, Card, fmtTime } from '../components/ui';
 import { sourceStatus } from '../lib/api/http';
 import { SOURCES } from '../data/sources';
+import { TripCalendar, SunTable } from '../components/Trip';
+import { addDays } from '../lib/sun';
 
 const PHASES: { id: string; when: string; items: string[] }[] = [
   { id: 'nov', when: 'November/desember 2026', items: ['Ferdigstille konseptuell rute', 'Kartlegge magasiner og barrierer (NVE)', 'Undersøke alternative korridorer', 'Dokumentere reguleringsstatus for alle vann ruten krysser'] },
@@ -18,6 +20,14 @@ export default function TimelinePage() {
   const daysLeft = Math.ceil((new Date(s.tripDate).getTime() - Date.now()) / 86400000);
   return (
     <div className="page">
+      <Card title="Turdatoer" right={<span className="small muted">Alle beregninger følger valgt dato</span>}>
+        <TripCalendar />
+        <p className="small">Værprognose (MET) tilgjengelig fra ca. <b>{addDays(s.tripDate, -9)}</b>. Skredvarsel publiseres daglig 1. des–31. mai.</p>
+      </Card>
+      <Card title="Sol og dagslys per dag (beregnet for etappens midtpunkt)" className="wide">
+        <SunTable />
+        <p className="small muted">Beregnet med SunCalc (astronomiske formler, ~1 min nøyaktighet) for datoen og koordinatene midt på hver dagsetappe. Tidssone Europe/Oslo – sommertid starter 28.03.2027.</p>
+      </Card>
       <Card title={`Planleggingskalender · ${daysLeft} dager til ${s.tripDate}`} className="wide">
         <div className="timeline">
           {PHASES.map((p) => (
@@ -42,6 +52,7 @@ export default function TimelinePage() {
           <li><Badge s={s.checklist['varsom'] ? 'GRØNN' : 'GRÅ'} /> Skredvarsel lest siste døgn</li>
           <li><Badge s={s.checklist['met'] ? 'GRØNN' : 'GRÅ'} /> Vind-/værprognose for alle dager</li>
           <li><Badge s={s.checklist['kom'] ? 'GRØNN' : 'GRÅ'} /> Satellittkommunikasjon testet</li>
+          <li><Badge s={s.lakeOverrides.some((o) => o.active && o.reviewRequired && !o.reviewedAt) ? 'RØD' : 'GRØNN'} /> Alle vann-overstyringer gjennomgått (Overstyringer-fanen)</li>
         </ul>
         <p className="small muted">GO er alltid din egen vurdering. Verktøyet kan bare si NO-GO når kjente data mangler eller viser barrierer.</p>
       </Card>

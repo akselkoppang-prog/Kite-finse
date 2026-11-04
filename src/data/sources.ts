@@ -13,6 +13,7 @@ export type SourceId =
   | 'nve-vannkraft-wms'
   | 'nve-skred-wms'
   | 'met-forecast'
+  | 'met-frost'
   | 'varsom'
   | 'bruker-gpx'
   | 'kunnskap-regulering';
@@ -146,6 +147,17 @@ export const SOURCES: Record<SourceId, SourceDef> = {
     license: 'CC BY 4.0 / NLOD – © MET Norge',
     researchNote: 'Krever identifiserbar klient; nettleseren sender Origin/User-Agent. Ingen nøkkel. Respekter vilkår (ikke spam-polling).',
     needsKey: false,
+  },
+  'met-frost': {
+    id: 'met-frost',
+    name: 'Frost API (observasjoner/klimatologi)',
+    provider: 'MET Norge',
+    kind: 'REST-API',
+    urls: ['https://frost.met.no/observations/v0.jsonld'],
+    usedFor: 'Historisk vind/kast/temperatur for mars–april fra nærmeste stasjoner (klimatologi, ikke prognose).',
+    license: 'CC BY 4.0 / NLOD – © MET Norge',
+    researchNote: 'Krever gratis klient-ID (registrer på frost.met.no). Legg den inn under Vær & vind. Lagres kun lokalt i nettleseren/prosjektfilen.',
+    needsKey: true,
   },
   varsom: {
     id: 'varsom',

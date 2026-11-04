@@ -7,6 +7,7 @@ import { featureName, findNumeric, type PolyFeature } from '../api/nve';
 import { uid } from '../geo';
 
 export interface Barrier {
+  /** Stabil nøkkel (NVE-nummer/navn) – brukes av overstyringer */
   id: string;
   kind: 'magasin' | 'innsjø' | 'sone';
   name: string;
@@ -34,8 +35,9 @@ export function buildBarriers(reservoirs: PolyFeature[], lakes: PolyFeature[], z
   reservoirs.forEach((f, i) => {
     const nm = featureName(f.properties) ?? `NVE-magasin #${i + 1}`;
     const reg = matchWater(nm);
+    const rid = findNumeric(f.properties, /^(magasinnr|magnr|objectid|fid)$/i);
     out.push({
-      id: `res_${i}`,
+      id: `res_${rid ?? nm}`,
       kind: 'magasin',
       name: nm,
       status: 'RØD',

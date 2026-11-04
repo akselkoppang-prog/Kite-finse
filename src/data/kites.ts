@@ -18,6 +18,12 @@ export interface Kite {
   upwind: number;
   assessment: string;
   role: string;
+  /** Faglige vurderinger (ikke produsentdata) for sammenligning */
+  windChar: string;
+  relaunch: string;
+  packability: string;
+  snowSuit: string;
+  pulkSuit: string;
 }
 
 export const KITES: Kite[] = [
@@ -26,47 +32,54 @@ export const KITES: Kite[] = [
     perf: 0.95, upwind: 0.6,
     assessment: 'Peak-serien er en robust freeride-/ekspedisjonsfoil med stor depower og forutsigbar oppførsel. Liten flate gir lav trekk med 110 kg i moderat vind.',
     role: 'Sterk vind / storm-kite. Siste kite opp før du pakker ned.',
+    windChar: 'Svært stort depower-område, stabil i kast', relaunch: 'God på snø (lukket celle holder formen)', packability: 'Liten – kompakt', snowSuit: 'God', pulkSuit: 'God i sterk vind, lite trekk i lett vind',
   },
   {
     id: 'hyper7', name: 'Ozone Hyperlink V1', size: 7, type: 'åpen-celle foil', maker: 'Ozone', makerUrl: 'https://www.ozonekites.com',
     perf: 0.95, upwind: 0.65,
     assessment: 'Åpen-celle snøfoil: lett, enkel å pakke og relansere på snø, men mister trykk ved landing og kan kollapse i turbulens.',
     role: 'Fyller hullet mellom 4 og 10 m² – trolig svært nyttig med tung pulk i frisk vind.',
+    windChar: 'Moderat område, følsom for turbulens', relaunch: 'Enkel på snø, mister trykk ved landing', packability: 'Svært god (lett, åpen celle)', snowSuit: 'Svært god – laget for snø', pulkSuit: 'God i frisk vind',
   },
   {
     id: 'stoke9', name: 'Flysurfer Stoke 2', size: 9, type: 'tube (LEI)', maker: 'Flysurfer', makerUrl: 'https://flysurfer.com',
     perf: 0.85, upwind: 0.55,
-    assessment: 'Tube-kite: krever pumping, blærer stive/sårbare i streng kulde, tyngre og mer volum. Lite egnet som ekspedisjonskite.',
-    role: 'Vurder å la ligge hjemme.',
+    assessment: 'Tube-kite: krever pumping, blærer stive/sårbare i streng kulde, tyngre og mer volum. Kan fungere – vurder mot egne erfaringer.',
+    role: 'Tube-kite – vurder pumpe, kulde og vekt opp mot din erfaring.',
+    windChar: 'Bredt område, direkte følelse', relaunch: 'Relansering avhenger av vind/snø; tube hjelper', packability: 'Dårlig – pumpe, blærer, volum', snowSuit: 'Middels (kulde stivner blærer)', pulkSuit: 'Middels – brukbar, men lavere glid enn foil',
   },
   {
     id: 'sonic10', name: 'Flysurfer Sonic 4', size: 10, type: 'lukket-celle foil', maker: 'Flysurfer', makerUrl: 'https://flysurfer.com',
     perf: 1.12, upwind: 0.95,
     assessment: 'Høyytelses lukket-celle foil: best glid og upwind i quiveren, høy fart. Krever mer aktiv flyging; mindre tilgivende i rotor/turbulens enn Soul/Peak.',
     role: 'Primærkite ved gode forhold – effektiv distanse og upwind.',
+    windChar: 'Høyt glid, best upwind, mindre tilgivende i rotor', relaunch: 'Krever teknikk; lukket celle relanserer bra', packability: 'Middels', snowSuit: 'God', pulkSuit: 'Svært god – effektiv distanse og upwind',
   },
   {
     id: 'pivot10', name: 'Naish Pivot', size: 10, type: 'tube (LEI)', maker: 'Naish', makerUrl: 'https://www.naishkites.com',
     perf: 0.85, upwind: 0.5,
     assessment: 'Tube-kite for wave/freeride – samme ulemper som Stoke på ekspedisjon. Overlapper Sonic 10.',
-    role: 'Overflødig – la ligge hjemme.',
+    role: 'Tube-kite som overlapper Sonic 10 – ditt valg.',
+    windChar: 'Bredt, tilgivende tube-område', relaunch: 'God relansering for tube', packability: 'Dårlig – pumpe, blærer, volum', snowSuit: 'Middels (kulde)', pulkSuit: 'Middels',
   },
   {
     id: 'soul15', name: 'Flysurfer Soul V1', size: 15, type: 'lukket-celle foil', maker: 'Flysurfer', makerUrl: 'https://flysurfer.com',
     perf: 1.08, upwind: 0.85,
     assessment: 'Lettvind lukket-celle foil med god glid og stabilitet. Stor flate gir god trekk med tung pulk i lett vind.',
     role: 'Lettvindskite – avgjørende for fremdrift med pulk i 4–7 m/s.',
+    windChar: 'Lett vind, god glid og stabilitet', relaunch: 'God (lukket celle)', packability: 'Middels–stor', snowSuit: 'God', pulkSuit: 'Svært god i lett vind',
   },
   {
     id: 'soul18', name: 'Flysurfer Soul V2', size: 18, type: 'lukket-celle foil', maker: 'Flysurfer', makerUrl: 'https://flysurfer.com',
     perf: 1.1, upwind: 0.85,
     assessment: 'Svært stor flate: gir fremdrift i helt lett vind på hard snø, men tung, treg i svinger og krevende ved vindøkning/kast.',
     role: 'Situasjonsbetinget: kun hvis langvarig lett vind og hard snø er sannsynlig. Overlapper Soul 15.',
+    windChar: 'Svært lett vind, treg i svinger', relaunch: 'God, men tung å håndtere', packability: 'Stor', snowSuit: 'God på hard snø', pulkSuit: 'God i helt lett vind, krevende ved vindøkning',
   },
 ];
 
-export const QUIVER_ADVICE = `Faglig vurdering (ikke garanti): En ekspedisjonsquiver bør dekke vindspekteret med 3–4 kites og minimal vekt.
+export const QUIVER_ADVICE = `Rådgivende forslag (ikke garanti, du velger selv): En ekspedisjonsquiver bør dekke vindspekteret med 3–4 kites og minimal vekt.
 Forslag: Peak 4 (sterk vind) – Hyperlink 7 (frisk vind) – Sonic 10 (primær) – Soul 15 (lett vind).
 Soul 18 tas bare med hvis prognosene tilsier langvarig lett vind på hard snø; ellers spares ~2–3 kg og volum.
-Tube-kitene (Stoke 9, Pivot 10) frarådes: pumpe, blærer i kulde, vekt, og de overlapper Sonic 10.
+Tube-kitene (Stoke 9, Pivot 10): ulempene er pumpe, blærer i kulde, vekt og overlapp med Sonic 10 – men det er ditt valg; ingen kite er utelukket.
 Pakk reservelinjer/bridle-reparasjon og vurder å forhåndstrimme Sonic for pulktrekk (mer stabilitet).`;
