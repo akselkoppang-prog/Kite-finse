@@ -10,6 +10,9 @@ export const TZ = 'Europe/Oslo';
 export interface SunDay {
   date: string; // YYYY-MM-DD (lokal dato)
   at: LatLon;
+  heightM: number;
+  astroDawn: Date | null;
+  nauticalDawn: Date | null;
   civilDawn: Date | null;
   sunrise: Date | null;
   goldenEnd: Date | null; // slutt på morgenens gylne time
@@ -17,6 +20,8 @@ export interface SunDay {
   goldenStart: Date | null; // start på kveldens gylne time
   sunset: Date | null;
   civilDusk: Date | null;
+  nauticalDusk: Date | null;
+  astroDusk: Date | null;
   daylightH: number; // soloppgang→solnedgang
   civilH: number; // borgerlig demring→skumring (brukbart lys)
 }
@@ -25,12 +30,20 @@ const valid = (d: Date) => (Number.isFinite(d.getTime()) ? d : null);
 const hours = (a: Date | null, b: Date | null) => (a && b ? (b.getTime() - a.getTime()) / 3600000 : 0);
 
 /** Lokal dato (YYYY-MM-DD) tolkes som middag lokal tid for å treffe riktig døgn. */
-export function sunDay(dateStr: string, at: LatLon): SunDay {
+/**
+ * heightM: observatørens høyde over omkringliggende horisont. SunCalc korrigerer for horisontdukking
+ * (−2,076·√h bueminutter). Merk: på vidda er horisonten ~flat; i dype daler (Rjukan!) skygger fjellene –
+ * astronomisk soloppgang ≠ når sola faktisk når dalbunnen.
+ */
+export function sunDay(dateStr: string, at: LatLon, heightM = 0): SunDay {
   const noonGuess = atLocalHour(dateStr, 12);
-  const t = SunCalc.getTimes(noonGuess, at.lat, at.lon);
+  const t = SunCalc.getTimes(noonGuess, at.lat, at.lon, Math.max(0, Math.min(heightM, 300)));
   const r: SunDay = {
     date: dateStr,
     at,
+    heightM,
+    astroDawn: valid(t.nightEnd),
+    nauticalDawn: valid(t.nauticalDawn),
     civilDawn: valid(t.dawn),
     sunrise: valid(t.sunrise),
     goldenEnd: valid(t.goldenHourEnd),
@@ -38,6 +51,8 @@ export function sunDay(dateStr: string, at: LatLon): SunDay {
     goldenStart: valid(t.goldenHour),
     sunset: valid(t.sunset),
     civilDusk: valid(t.dusk),
+    nauticalDusk: valid(t.nauticalDusk),
+    astroDusk: valid(t.night),
     daylightH: 0,
     civilH: 0,
   };

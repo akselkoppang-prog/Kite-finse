@@ -96,6 +96,11 @@ export interface Camp extends LatLon {
   source: 'manuell' | 'beregnet kandidat';
   note?: string;
   approved?: boolean;
+  role?: 'foretrukket' | 'reserve';
+  notes?: string;
+  attachments?: Attachment[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Place extends LatLon {

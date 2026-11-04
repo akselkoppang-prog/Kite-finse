@@ -4,6 +4,11 @@ import type { Camp, HistoryEntry, LakeOverride, Marker, Place, Quiver, Route, Wa
 import type { Category } from '../data/categories';
 import { DEFAULT_PARAMS, DEFAULT_SCENARIOS, type Scenario, type TravelParams } from '../lib/analysis/feasibility';
 import type { Forecast } from '../lib/api/met';
+import { DEFAULT_SIM, type SimParams } from '../lib/sim/physics';
+import type { ManualWind, RouteForecastPoint } from '../lib/sim/wind';
+import type { SimResult } from '../lib/sim/route';
+import type { CalibTrack } from '../lib/sim/calibration';
+import type { SpecValue, KiteModel } from '../data/kiteSpecs';
 import { DEFAULT_PACKING, type PackItem } from '../data/packing';
 import type { Dir8 } from '../lib/geo';
 import type { NveHydro, PolyFeature } from '../lib/api/nve';
@@ -11,7 +16,22 @@ import type { TerrainAnalysis } from '../lib/analysis/terrain';
 import type { Snow, Terrain, Goal } from '../lib/analysis/kite';
 import { uid } from '../lib/geo';
 
-export type Tab = 'kart' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder';
+export type Tab = 'kart' | 'simulator' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder' | 'modell';
+
+export interface SimUI {
+  startDay: number;
+  startHour: number;
+  fromKm: number;
+  toKm: number | null;
+  kiteMode: 'quiver' | 'single';
+  kiteId: string;
+  useForecast: boolean;
+  manual: ManualWind;
+  compareIds: string[];
+  multiDay: boolean;
+}
+export interface Itinerary { id: string; name: string; dayKm: number[] }
+export interface DailyCand { lat: number; lon: number; d: number; score: number; text: string; flags: string[] }
 export type EditMode = 'none' | 'add' | 'insert' | 'zone' | 'camp' | 'marker';
 
 export interface WindPoint { label: string; lat: number; lon: number; fc: Forecast }
@@ -88,6 +108,18 @@ export interface State {
   frostClientId: string;
   forecastHour: number;
   windPoints: WindPoint[];
+  sim: SimUI;
+  simParams: SimParams;
+  kiteModelEdits: Record<string, Partial<KiteModel & { area: number }>>;
+  kiteSpecEdits: Record<string, Record<string, SpecValue>>;
+  calibTracks: CalibTrack[];
+  itineraries: Itinerary[];
+  daily: { startKm: number; targetKm: number; startHour: number; day: number };
+  sunCfg: { descentMarginH: number; compareYear: number };
+  routeForecast: { points: RouteForecastPoint[]; fetchedAt: string } | null;
+  simPlay: { result: SimResult | null; t: number; playing: boolean; rate: number; runAt?: string };
+  dailyView: { lat: number; lon: number; cands: DailyCand[] } | null;
+  selectedCamp: string | null;
 
   set: (p: Partial<State>) => void;
   setTab: (t: Tab) => void;
@@ -111,6 +143,37 @@ export interface State {
 }
 
 const now = () => new Date().toISOString();
+
+/** localStorage som aldri kaster: ved full lagring vises en advarsel i stedet for at appen krasjer. */
+export const storageHealth = { ok: true, message: '', bytes: 0 };
+const safeStorage = {
+  getItem: (k: string) => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (k: string, v: string) => {
+    try {
+      localStorage.setItem(k, v);
+      storageHealth.ok = true;
+      storageHealth.message = '';
+      storageHealth.bytes = v.length * 2;
+    } catch {
+      storageHealth.ok = false;
+      storageHealth.bytes = v.length * 2;
+      storageHealth.message = `Nettleserlagringen er full (${(v.length / 512).toFixed(0)} kB plan). Siste endringer er IKKE lagret – last ned prosjektfilen og fjern store bilder.`;
+    }
+  },
+  removeItem: (k: string) => {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      /* */
+    }
+  },
+};
 function pushHist(h: HistoryEntry[], kind: HistoryEntry['kind'], text: string): HistoryEntry[] {
   return [{ at: now(), kind, text }, ...h].slice(0, 300);
 }
@@ -174,6 +237,33 @@ export const useStore = create<State>()(
       frostClientId: '',
       forecastHour: 0,
       windPoints: [],
+      sim: {
+        startDay: 1,
+        startHour: 8,
+        fromKm: 0,
+        toKm: null,
+        kiteMode: 'quiver',
+        kiteId: 'sonic10',
+        useForecast: false,
+        manual: { dir: 225, avg: 8, min: 5, max: 11, gust: 11, tempC: -8, hourly: [] },
+        compareIds: ['peak4', 'hyper7', 'stoke9', 'sonic10', 'pivot10', 'soul15', 'soul18'],
+        multiDay: true,
+      },
+      simParams: DEFAULT_SIM,
+      kiteModelEdits: {},
+      kiteSpecEdits: {},
+      calibTracks: [],
+      itineraries: [
+        { id: 'it-a', name: 'Plan A (50/40/rest)', dayKm: [50, 40] },
+        { id: 'it-b', name: 'Plan B (35/50/rest)', dayKm: [35, 50] },
+        { id: 'it-c', name: 'Plan C (40/35/rest)', dayKm: [40, 35] },
+      ],
+      daily: { startKm: 0, targetKm: 50, startHour: 8, day: 1 },
+      sunCfg: { descentMarginH: 1.5, compareYear: 2027 },
+      routeForecast: null,
+      simPlay: { result: null, t: 0, playing: false, rate: 5 },
+      dailyView: null,
+      selectedCamp: null,
 
       set: (p) => set(p),
       setTab: (tab) => set({ tab }),
@@ -256,10 +346,10 @@ export const useStore = create<State>()(
     }),
     {
       name: 'kite.plan.v1',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeStorage),
       partialize: (s) => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { focus, editMode, draftZone, selectedWp, selectedMarker, selectedBarrier, forecastHour, windPoints, set: _s, ...rest } = s;
+        const { focus, editMode, draftZone, selectedWp, selectedMarker, selectedBarrier, forecastHour, windPoints, simPlay, dailyView, selectedCamp, set: _s, ...rest } = s;
         return Object.fromEntries(Object.entries(rest).filter(([, v]) => typeof v !== 'function')) as Partial<State>;
       },
     },

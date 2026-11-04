@@ -1,4 +1,4 @@
-import { fetchJson, pool } from './http';
+import { fetchJson, pool, validLatLon } from './http';
 import type { LatLon } from '../geo';
 import type { Place } from '../../types';
 import type { PlaceQuery } from '../../data/places';
@@ -24,8 +24,10 @@ export interface PlaceCandidate extends LatLon {
 
 export async function searchPlace(q: string): Promise<PlaceCandidate[]> {
   const url = `${SSR}/navn?sok=${encodeURIComponent(q)}&fuzzy=false&utkoordsys=4258&treffPerSide=50&side=1`;
-  const json = await fetchJson<{ navn: SsrNavn[] }>('kv-stedsnavn', url);
+  const json = await fetchJson<{ navn: SsrNavn[] }>('kv-stedsnavn', url, undefined, { cacheMs: 86400000, nature: 'kartdata' });
+  if (!Array.isArray(json.navn)) throw new Error('Uventet svar fra stedsnavn-API (mangler «navn»)');
   return (json.navn ?? [])
+    .filter((n) => n.representasjonspunkt && Number.isFinite(n.representasjonspunkt.nord) && Number.isFinite(n.representasjonspunkt.øst))
     .map((n) => ({
       name: n.skrivemåte,
       type: n.navneobjekttype,
@@ -66,6 +68,7 @@ export async function resolvePlace(q: PlaceQuery): Promise<{ place?: Place; cand
 
 /** Nærmeste stedsnavn innen radius (m). */
 export async function nearestName(p: LatLon, radius = 2500): Promise<{ name: string; type: string; dist?: number } | undefined> {
+  if (!validLatLon(p.lat, p.lon)) throw new Error('Ugyldig koordinat');
   const url = `${SSR}/punkt?nord=${p.lat}&ost=${p.lon}&koordsys=4258&radius=${radius}&utkoordsys=4258&treffPerSide=20&side=1`;
   const json = await fetchJson<{ navn: (SsrNavn & { meterFraPunkt?: number; stedsnavn?: { skrivemåte: string }[] })[] }>('kv-stedsnavn', url);
   const n = json.navn?.[0];
@@ -91,13 +94,24 @@ const elevCache: Record<string, ElevPoint> = (() => {
   }
 })();
 let saveTimer: number | undefined;
+const MAX_CACHE = 30000;
+export let elevCacheWarning = '';
 function persistCache() {
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
+    const keys = Object.keys(elevCache);
+    if (keys.length > MAX_CACHE) keys.slice(0, keys.length - MAX_CACHE).forEach((k) => delete elevCache[k]); // eldste ut
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(elevCache));
+      elevCacheWarning = '';
     } catch {
-      /* full lagring – ignorer */
+      // Lagring full: halver cachen og prøv igjen, ellers behold kun i minnet
+      Object.keys(elevCache).slice(0, Math.floor(Object.keys(elevCache).length / 2)).forEach((k) => delete elevCache[k]);
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(elevCache));
+      } catch {
+        elevCacheWarning = 'Nettleserlagringen er full – høydedata caches bare i minnet.';
+      }
     }
   }, 500);
 }
@@ -116,7 +130,7 @@ async function fetchBatch(pts: LatLon[]): Promise<ElevPoint[]> {
     try {
       const arr = JSON.stringify(pts.map((p) => [Number(p.lon.toFixed(6)), Number(p.lat.toFixed(6))]));
       const url = `${HOYDE}?koordsys=4258&punkter=${encodeURIComponent(arr)}&geojson=false`;
-      const json = await fetchJson<{ punkter: HoydePunkt[] }>('kv-hoyde', url);
+      const json = await fetchJson<{ punkter: HoydePunkt[] }>('kv-hoyde', url, undefined, { nature: 'kartdata', retries: 1 });
       if (!Array.isArray(json.punkter) || json.punkter.length !== pts.length) throw new Error('uventet svar');
       batchSupported = true;
       return json.punkter.map((r, i) => ({ ...pts[i], z: r.z, terreng: r.terreng, datakilde: r.datakilde }));
@@ -127,26 +141,44 @@ async function fetchBatch(pts: LatLon[]): Promise<ElevPoint[]> {
   }
   return pool(pts, 4, async (p) => {
     const url = `${HOYDE}?koordsys=4258&nord=${p.lat}&ost=${p.lon}&geojson=false`;
-    const json = await fetchJson<{ punkter: HoydePunkt[] }>('kv-hoyde', url);
+    const json = await fetchJson<{ punkter: HoydePunkt[] }>('kv-hoyde', url, undefined, { nature: 'kartdata' });
     const r = json.punkter?.[0];
     return { ...p, z: r?.z ?? null, terreng: r?.terreng, datakilde: r?.datakilde };
   });
 }
 
-/** Henter DTM-høyder (med cache). onProgress gir 0–1. */
+/** Pågående oppslag per punkt – hindrer at flere komponenter henter de samme punktene samtidig. */
+const pending = new Map<string, Promise<ElevPoint>>();
+
+/** Henter DTM-høyder (med cache og deling av pågående kall). onProgress gir 0–1. */
 export async function elevations(pts: LatLon[], onProgress?: (f: number) => void): Promise<ElevPoint[]> {
-  const missing = pts.filter((p) => !elevCache[ckey(p)]);
+  const bad = pts.find((p) => !validLatLon(p.lat, p.lon));
+  if (bad) throw new Error(`Ugyldig koordinat ${bad.lat}, ${bad.lon}`);
+  const missing = pts.filter((p) => !elevCache[ckey(p)] && !pending.has(ckey(p)));
   const uniq = Array.from(new Map(missing.map((p) => [ckey(p), p])).values());
   const chunks: LatLon[][] = [];
   for (let i = 0; i < uniq.length; i += 50) chunks.push(uniq.slice(i, i + 50));
   let done = 0;
-  await pool(chunks, 3, async (c) => {
+  const run = pool(chunks, 3, async (c) => {
     const res = await fetchBatch(c);
     res.forEach((r) => (elevCache[ckey(r)] = r));
     persistCache();
     done++;
-    onProgress?.(done / chunks.length);
+    onProgress?.(done / Math.max(1, chunks.length));
+    return res;
   });
+  // registrer hvert punkt som pågående
+  chunks.forEach((c, ci) =>
+    c.forEach((p, pi) => {
+      const k = ckey(p);
+      const pr = run.then((all) => all[ci][pi]);
+      pending.set(k, pr);
+      pr.catch(() => undefined).finally(() => pending.delete(k));
+    }),
+  );
+  await run;
+  // vent også på punkter som andre kall henter
+  await Promise.all(pts.map((p) => pending.get(ckey(p))).filter(Boolean));
   onProgress?.(1);
   return pts.map((p) => elevCache[ckey(p)] ?? { ...p, z: null });
 }

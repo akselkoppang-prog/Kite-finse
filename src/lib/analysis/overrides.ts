@@ -55,11 +55,13 @@ export function evaluateCrossings(
     }
     if (c.barrier.kind === 'sone' && c.barrier.status === 'RØD') hazards.push('Egen forbudt sone – kan ikke overstyres');
     const candidates = overrides.filter((o) => o.barrierKey === c.barrier.id);
-    const applicable = candidates.find((o) => {
+    const matching = candidates.filter((o) => {
       if (!o.segment) return true;
       if (o.segment.routeId !== ctx.routeId) return false;
       return c.fromD / 1000 <= o.segment.toKm && c.toD / 1000 >= o.segment.fromKm;
     });
+    // Aktiv overstyring først, ellers den nyeste (for å vise riktig status, f.eks. «utløpt»)
+    const applicable = matching.find((o) => overrideState(o, ctx.tripDate) === 'aktiv') ?? [...matching].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     const st = applicable ? overrideState(applicable, ctx.tripDate) : undefined;
     const overrideOk = !!applicable && (st === 'aktiv') && c.barrier.kind !== 'sone';
     const red = c.barrier.status === 'RØD';

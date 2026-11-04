@@ -1,4 +1,4 @@
-import { fetchJson } from './http';
+import { fetchJson, validLatLon } from './http';
 import type { LatLon } from '../geo';
 
 export interface ForecastRow {
@@ -15,6 +15,7 @@ export interface ForecastRow {
   precipMax?: number;
   symbol?: string;
   fog?: number;
+  pressure?: number;
 }
 
 export interface Forecast {
@@ -34,14 +35,22 @@ interface MetTs {
 }
 
 export async function forecast(p: LatLon & { label: string }): Promise<Forecast> {
+  if (!validLatLon(p.lat, p.lon)) throw new Error(`Ugyldig koordinat ${p.lat}, ${p.lon}`);
+  // MET ber om maks 4 desimaler (bedre caching) og at Expires respekteres – fetchJson cacher etter Expires.
   const url = `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${p.lat.toFixed(4)}&lon=${p.lon.toFixed(4)}`;
-  const json = await fetchJson<{ properties: { meta: { updated_at: string }; timeseries: MetTs[] } }>('met-forecast', url);
+  const json = await fetchJson<{ properties: { meta: { updated_at: string }; timeseries: MetTs[] } }>('met-forecast', url, undefined, {
+    cacheMs: 30 * 60000,
+    nature: 'prognose',
+    dataTime: (j) => (j as { properties?: { meta?: { updated_at?: string } } }).properties?.meta?.updated_at,
+  });
+  if (!json?.properties?.timeseries?.length) throw new Error('Uventet svar fra MET (mangler timeseries)');
   const rows = json.properties.timeseries.map((t) => {
     const d = t.data.instant.details;
     const n = t.data.next_1_hours ?? t.data.next_6_hours;
     return {
       time: t.time,
       windSpeed: d.wind_speed,
+      pressure: d.air_pressure_at_sea_level,
       windGust: d.wind_speed_of_gust,
       windFrom: d.wind_from_direction,
       windP10: d.wind_speed_percentile_10,

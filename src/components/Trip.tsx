@@ -77,20 +77,36 @@ export function TripCalendar() {
   );
 }
 
-/** Tidslinje for én dag: mørke / borgerlig skumring / gylden time / dagslys / planlagt reise. */
-export function DaylightBar({ sun, startH, endH }: { sun: SunDay; startH?: number; endH?: number }) {
+/** 24-timers tidslinje: natt / astronomisk / nautisk / borgerlig tussmørke / dagslys (+ planlagt reise). */
+export function DaylightBar({ sun, startH, endH, label }: { sun: SunDay; startH?: number; endH?: number; label?: string }) {
   const pct = (h: number | null) => (h == null ? 0 : Math.max(0, Math.min(100, (h / 24) * 100)));
-  const cd = hourOf(sun.civilDawn), sr = hourOf(sun.sunrise), ge = hourOf(sun.goldenEnd), gs = hourOf(sun.goldenStart), ss = hourOf(sun.sunset), cu = hourOf(sun.civilDusk);
-  const seg = (a: number | null, b: number | null, cls: string, title: string) => (a != null && b != null ? <div className={`dl ${cls}`} style={{ left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%` }} title={title} /> : null);
+  const H = (d: Date | null) => hourOf(d);
+  const ad = H(sun.astroDawn), nd = H(sun.nauticalDawn), cd = H(sun.civilDawn), sr = H(sun.sunrise), ss = H(sun.sunset), cu = H(sun.civilDusk), nu = H(sun.nauticalDusk), au = H(sun.astroDusk);
+  const seg = (a: number | null, b: number | null, cls: string, title: string) => (a != null && b != null && b > a ? <div className={`dl ${cls}`} style={{ left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%` }} title={title} /> : null);
   return (
-    <div className="dlbar" role="img" aria-label={`Soloppgang ${fmtClock(sun.sunrise)}, solnedgang ${fmtClock(sun.sunset)}`}>
-      {seg(cd, sr, 'civil', 'Borgerlig demring')}
-      {seg(sr, ge, 'golden', 'Gylden time')}
-      {seg(ge, gs, 'day', 'Dagslys')}
-      {seg(gs, ss, 'golden', 'Gylden time')}
-      {seg(ss, cu, 'civil', 'Borgerlig skumring')}
-      {startH != null && endH != null && <div className="dl travel" style={{ left: `${pct(startH)}%`, width: `${Math.max(0.5, pct(endH) - pct(startH))}%` }} title="Planlagt reisetid" />}
-      {[0, 6, 12, 18].map((h) => <span key={h} className="dl-tick" style={{ left: `${pct(h)}%` }}>{String(h).padStart(2, '0')}</span>)}
+    <div className="dlwrap">
+      {label && <div className="dl-label small">{label}</div>}
+      <div className="dlbar" role="img" aria-label={`${label ?? ''} soloppgang ${fmtClock(sun.sunrise)}, solnedgang ${fmtClock(sun.sunset)}`}>
+        {seg(ad ?? 0, nd, 'astro', 'Astronomisk tussmørke')}
+        {seg(nd, cd, 'nautical', 'Nautisk tussmørke')}
+        {seg(cd, sr, 'civil', 'Borgerlig tussmørke')}
+        {seg(sr, ss, 'day', 'Dagslys')}
+        {seg(ss, cu, 'civil', 'Borgerlig tussmørke')}
+        {seg(cu, nu, 'nautical', 'Nautisk tussmørke')}
+        {seg(nu, au ?? 24, 'astro', 'Astronomisk tussmørke')}
+        {startH != null && endH != null && <div className="dl travel" style={{ left: `${pct(startH)}%`, width: `${Math.max(0.5, pct(endH) - pct(startH))}%` }} title="Planlagt reisetid" />}
+        {sr != null && <span className="dl-sun" style={{ left: `${pct(sr)}%` }}>☀↑ {fmtClock(sun.sunrise)}</span>}
+        {ss != null && <span className="dl-sun right" style={{ left: `${pct(ss)}%` }}>{fmtClock(sun.sunset)} ↓☀</span>}
+        {[0, 6, 12, 18].map((h) => <span key={h} className="dl-tick" style={{ left: `${pct(h)}%` }}>{String(h).padStart(2, '0')}</span>)}
+      </div>
+    </div>
+  );
+}
+
+export function DaylightLegend() {
+  return (
+    <div className="legendmini small">
+      <span><i className="dl astro" />Astronomisk</span><span><i className="dl nautical" />Nautisk</span><span><i className="dl civil" />Borgerlig tussmørke</span><span><i className="dl day" />Dagslys</span><span><i className="dl travel" />Planlagt reise</span>
     </div>
   );
 }

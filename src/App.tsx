@@ -20,11 +20,17 @@ import LakePanel from './components/LakePanel';
 import WaypointPanel from './components/WaypointPanel';
 import { TripSummary } from './components/Trip';
 import { KITES } from './data/kites';
+import SimulatorPage from './pages/SimulatorPage';
+import ModelPage from './pages/ModelPage';
+import CampPanel from './components/CampPanel';
+import { SimPlayer } from './components/sim/SimPlayer';
+import { storageHealth } from './state/store';
 import { Badge } from './components/ui';
 import { fmtKm } from './lib/geo';
 
 const TABS: [Tab, string][] = [
   ['kart', 'Kart & rute'],
+  ['simulator', 'YTELSESSIMULATOR'],
   ['vind', 'Vær & vind'],
   ['kite', 'Kite-quiver'],
   ['sikkerhet', 'Sikkerhet'],
@@ -32,7 +38,8 @@ const TABS: [Tab, string][] = [
   ['overstyring', 'Overstyringer'],
   ['utstyr', 'Utstyr & offline'],
   ['tidslinje', 'Kalender'],
-  ['kilder', 'Datakilder'],
+  ['modell', 'Modell & kalibrering'],
+  ['kilder', 'Datakilder & diagnose'],
 ];
 
 function Overview() {
@@ -67,6 +74,7 @@ export default function App() {
   const selWp = useStore((s) => s.selectedWp);
   const selMk = useStore((s) => s.selectedMarker);
   const selBar = useStore((s) => s.selectedBarrier);
+  const selCamp = useStore((s) => s.selectedCamp);
   const setTab = useStore((s) => s.setTab);
   const [side, setSide] = useState(window.innerWidth > 900);
   useEffect(() => {
@@ -102,6 +110,7 @@ export default function App() {
       <div className="banner">
         Alle ruter er <b>FORSLAG – ikke verifisert i terrenget</b>. «Brukergodkjent» er din egen vurdering, ikke uavhengig verifisering. Verktøyet erstatter ikke skredvarsel, isvurdering eller lokalkunnskap.
       </div>
+      {!storageHealth.ok && <div className="banner err">{storageHealth.message}</div>}
       <main className={`main tab-${tab}`}>
         <div className={`mapwrap ${tab === 'kart' ? '' : 'hidden'}`}>
           <div className={`side ${side ? 'open' : ''}`}>
@@ -120,6 +129,8 @@ export default function App() {
               {selBar && <LakePanel key={selBar} id={selBar} />}
               {!selBar && selWp && <WaypointPanel key={selWp} kind="wp" id={selWp} />}
               {!selBar && !selWp && selMk && <WaypointPanel key={selMk} kind="marker" id={selMk} />}
+              {!selBar && !selWp && !selMk && selCamp && <CampPanel key={selCamp} id={selCamp} />}
+              <SimPlayer />
             </div>
             <ElevationProfile />
           </div>
@@ -134,6 +145,8 @@ export default function App() {
         {tab === 'kite' && <KitePage />}
         {tab === 'sikkerhet' && <SafetyPage />}
         {tab === 'dagplan' && <DayPlanPage />}
+        {tab === 'simulator' && <SimulatorPage />}
+        {tab === 'modell' && <ModelPage />}
         {tab === 'overstyring' && <OverridesPage />}
         {tab === 'utstyr' && <GearPage />}
         {tab === 'tidslinje' && <TimelinePage />}

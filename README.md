@@ -38,6 +38,76 @@ Slå på Pages i repoets innstillinger (Settings → Pages → Source: GitHub Ac
 
 Planen lagres automatisk i nettleseren (localStorage).
 
+## Versjon 3 – ytelsessimulator
+
+### Nytt
+- **YTELSESSIMULATOR** (egen fane): velg dag, starttid, strekning, kite eller quiver, vindretning (8 forvalg + egendefinert), middel/min/maks/kast, variabilitet, temperatur og time-for-time-vind (manuelt eller MET-prognose langs ruten). Viser ankomst, total-/bevegelses-/kite-/kryss-/ski-/gå-tid, seilt distanse, dagsslutt, dagslys ved ankomst og usikkerhet (P10/P50/P90).
+- **Kitevurdering for hele vindfordelingen**: produsentens område (med kildeart), fysikkvindu for din last, ditt eget vindu, og status ved min/snitt/maks/kast.
+- **Samme rute med hver kite** (alle 7 + quiver) med forklaring og konfidens, og fartskurver per vinkel mot vinden.
+- **Avspilling i kartet** (▶/⏸/⏮, 1×/5×/10×) med posisjon, kite, vind, TWA, bakkefart og fremdrift.
+- **SIMULER DAGSDISTANSE** (5–100 km fra valgfritt startpunkt): sluttpunkt, ankomst, dagslys, gjenstående distanse, resten av turen, leirkandidater (DTM ±3 km, ikke bratt/skredutsatt/på vann/no-go), «Velg som leir», «Sett som slutt på dag N».
+- **Reiseplan-simulator**: sammenlign planer (f.eks. 50/40/rest, 35/50/rest, 40/35/rest), med konsekvenser når en dag blir for lang.
+- **Kitedatabase** med kilde per verdi (produsent / forhandler / test / beregnet / vurdering / ikke funnet / manuell) – redigerbar.
+- **Modell & kalibrering**: alle ligninger og parametre redigerbare, kiteparametre per kite, og import av egne GPS-spor for personlig kalibrering.
+- **Sol-simulator**: astronomisk/nautisk/borgerlig tussmørke, høydekorreksjon, sammenligning Finse → leirer → dag 3 → Rjukan, tidlig mars → sen april, margin for sluttnedstigning.
+- **GODKJENN FOR MIN RUTE**: ett klikk godkjenner én bestemt kryssing for denne turen (USER APPROVED). NVE-status og andre farer påvirkes ikke.
+- **Teltplasser**: panel med navn, natt, foretrukket/reserve, notater, bilder, godkjenning, dupliser og tydelig slett.
+- **Live-diagnose** (Datakilder): ekte kall mot hver tjeneste fra nettleseren med validering av svarformat.
+
+### Modell (forenklet kraftbalanse – se fanen «Modell & kalibrering»)
+```
+ρ = p/(R·T)                                      luft fra temperatur og høyde
+W_kite = W_10·ln(z_kite/z0)/ln(10/z0)            vind i kitehøyde
+F = min(½·ρ·A·c_F·W_a², F_hold)                  kitekraft, resten depowres
+ε = atan(1/G) + λ                                 glidetall + bakkens dragvinkel (skrens/pulk)
+fremdrift = F (AWA ≥ 90°+ε) ellers F·sin(AWA−ε)
+R = m·g·(μ+stigning) + ½·ρ·CdA·V²
+V = største fart ≤ komfortfart der fremdrift ≥ R
+VMG = max over kurs V(θ)·cos(avvik)  → kryss/jibb, stagvendinger ≈ L·tan(avvik)/korridor
+oppstart: ½ρA·c_F·boost·W² ≥ m·g·μ·k_start ;  overpower: ½ρA·c_F·(1−depower)·W² > F_hold·toleranse
+```
+Per 500 m-etappe: vind for tid og sted → 5 vindkvantiler → én kite oppe (bytter bare når det lønner seg) → tid = snitt over kvantiler (+ stagvendinger, ski/gåing/storm der kiten ikke virker) → dagen slutter ved borgerlig skumring − leirtid eller maks reisetid.
+
+**Antakelser:** c_F (0,78–0,85), depower (0,5–0,65), boost (1,4), μ (0,03–0,13), λ = 10°, F_hold = 0,65 × kroppsvekt, komfortfart 32 km/t × terrengfaktor 0,9. Glidetall G utledes av aspect ratio der den er dokumentert. Ingen kite har publiserte polardiagrammer – alt er estimater med usikkerhet. Kalibrer med egne spor.
+
+### Kitekilder (websøk 2026-11-04)
+| Kite | Dokumentert | Kilde |
+|---|---|---|
+| Peak V5 4 | AR 4,0 · 29 celler · projisert 3,2 m² · 0,70 kg | [flysurfer.com PEAK5](https://flysurfer-com.translate.goog/project/peak5/?_x_tr_sl=en&_x_tr_tl=es&_x_tr_hl=es&_x_tr_pto=tc) |
+| Hyperlink V1 7 | lukket celle · 7–18 kn land/snø (80 kg) | [Maxtrack](https://maxtrack.com/product/ozone-hyperlink-v1/), [Varuste](https://varuste.net/en/p82654/ozone-hyperlink-v1-complete-5m²) |
+| Stoke 2 9 | tube, 3 struts, kort bridle · zenith fra 6 kn | [flysurfer.com STOKE2](https://wp.flysurfer.com/project/stoke2/), [S2AS](https://www.s2as.com/products/flysurfer-stoke-2-kitesurf-kite) |
+| Sonic 4 10 | 45 celler · 1,78 kg · 12–33 kn (sweet 15–25) · AR 6,4 · projisert 8,32 m² | [flysurfer.com SONIC⁴](https://flysurfer.com/?p=50251), [S2AS](https://s2as.com/products/sonic) |
+| Pivot 10 | 3 struts · AR 4,5–4,68 og 14–28 kn (avhenger av årsmodell) | [Naish Pivot](https://www.naish.com/products/pivot), [Pivot LTD](https://www.naish.com/products/pivot-ltd) |
+| Soul V1 15 | projisert 12,44 m² · AR 5,6 · 41 celler · 2,74 kg | [flysurfer.com SOUL](https://flysurfer.com/project/soul/) |
+| Soul V2 18 | projisert 14,93 m² · AR 5,8 · 41 celler · 8–14 kn | [flysurfer.com SOUL2](https://flysurfer.com/project/soul2/), [Powerkiteshop](https://powerkiteshop.com/products/flysurfer-soul-2) |
+
+Ikke funnet: AR/vekt for Hyperlink V1, Stoke 2 og Pivot; vindområde for Soul V1 og Peak5 (produsentenes vindtabeller er bilder).
+
+### Testresultater
+- `npm test`: 60 logikk- og simuleringstester grønne (fysikk, kryss/jibb, rutesimulering, kalibrering, sol, overstyringer).
+- Nettleser-E2E (med teststubber fordi utviklingsmiljøet ikke når tjenestene): 70+ sjekker grønne, ingen JS-feil, ingen horisontal scroll på mobil.
+- Live-diagnose fra utviklingsmiljøet: alle eksterne tjenester rapporteres som FEIL (nettverket er sperret her) – det er riktig oppførsel. Kjør diagnosen i din nettleser.
+
+### Funnet og rettet i revisjonen
+1. DTM-høyder ble hentet flere ganger samtidig fra ulike komponenter → felles pågående-kall per punkt.
+2. Kildestatus overskrev «siste OK» ved feil → egne felt for siste OK, siste feil, datatid og dataart.
+3. Ingen gjentak ved 429/5xx → eksponentiell backoff med Retry-After.
+4. MET-svar ble ikke cachet etter Expires (krav i MET-vilkårene) → minnecache etter Expires/Cache-Control.
+5. Full localStorage krasjet lagring → trygg lagring med advarsel, og høydecachen begrenses og halveres ved behov.
+6. Ingen validering av koordinater før kall → validering (NaN, byttet lat/lon).
+7. Varsom-versjonen var ubekreftet → prøver v6.3.0 → v5.0.1 og husker første som virker.
+8. Prognose per turdag brukte UTC-timer → lokal tid (Europe/Oslo).
+9. Store GPX-filer tegnet tusenvis av dragbare markører → tynnes ut over 400 punkter.
+10. Whitelist: en deaktivert overstyring kunne skygge for en aktiv på samme vann → aktiv overstyring prioriteres.
+11. Modellfeil funnet av testene: kryss/jibb-merking var byttet om; sluttpunkt ble ikke nådd eksakt; kalibrering sammenlignet mot fart uten komfortgrense.
+
+### Kjente begrensninger
+- Endepunktene til Kartverket/NVE/MET/Varsom kunne ikke verifiseres fra utviklingsmiljøet (nettverket er sperret). Bruk «Kjør alle tester» under Datakilder.
+- NVEs lag-ID-er finnes automatisk etter navn. URL-ene til bratthets- og skred-WMS er ubekreftet.
+- Prognose langs ruten bruker nærmeste punkt og nærmeste time (ingen interpolasjon). Sikt finnes ikke i MET Locationforecast.
+- Fysikkmodellen er stasjonær: kitens egen fart i vinduet, kastdynamikk og kanalisering av vind i terreng er forenklet.
+- Terrengskygge for sol (f.eks. Rjukan-dalen) er ikke modellert.
+
 ## Versjon 2 – nye funksjoner
 
 | Funksjon | Hvor | Merknad |

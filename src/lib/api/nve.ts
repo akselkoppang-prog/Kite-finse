@@ -12,7 +12,8 @@ export async function discoverLayers(source: SourceId, bases: string[], re: RegE
   let lastErr: unknown;
   for (const base of bases) {
     try {
-      const json = await fetchJson<{ layers?: LayerInfo[] }>(source, `${base}/layers?f=json`);
+      const json = await fetchJson<{ layers?: LayerInfo[] }>(source, `${base}/layers?f=json`, undefined, { cacheMs: 3600000, nature: 'kartdata' });
+      if (!Array.isArray(json.layers)) throw new Error(`Uventet svar fra ${base} (mangler «layers»)`);
       const hits = (json.layers ?? []).filter((l) => re.test(l.name) && !(l.subLayerIds && l.subLayerIds.length));
       if (hits.length) return hits.map((l) => ({ base, id: l.id, name: l.name, geometryType: l.geometryType }));
       lastErr = new Error(`Ingen lag matcher ${re} i ${base}`);

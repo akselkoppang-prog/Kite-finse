@@ -34,6 +34,7 @@ export default function LakePanel({ id }: { id: string }) {
   const [fromKm, setFromKm] = useState(crossings[0] ? Math.max(0, crossings[0].fromD / 1000 - 0.5).toFixed(1) : '0');
   const [toKm, setToKm] = useState(crossings[0] ? (crossings[0].toD / 1000 + 0.5).toFixed(1) : '0');
   const [err, setErr] = useState('');
+  const [quickNote, setQuickNote] = useState('');
   const close = () => s.set({ selectedBarrier: null });
 
   if (!b) {
@@ -91,6 +92,39 @@ export default function LakePanel({ id }: { id: string }) {
         <h3>{b.name}</h3>
         <button className="btn small" onClick={close} aria-label="Lukk">✕</button>
       </header>
+      {b.kind !== 'sone' && crossings.length > 0 && route && (
+        <div className="quick">
+          {crossings.map((c, i) => {
+            const approvedHere = c.label === 'BRUKERGODKJENT';
+            return (
+              <div key={i} className="quickrow">
+                {approvedHere ? (
+                  <>
+                    <Badge s="BRUKER">USER APPROVED</Badge> Kryssing {(c.fromD / 1000).toFixed(1)}–{(c.toD / 1000).toFixed(1)} km
+                    <button className="btn small ghost" onClick={() => c.override && s.upsertOverride({ ...c.override, active: false }, `Fjernet godkjenning av ${b.name} (km ${(c.fromD / 1000).toFixed(1)})`)}>Angre</button>
+                  </>
+                ) : c.hazards.length ? (
+                  <span className="err small">Kryssing {(c.fromD / 1000).toFixed(1)} km kan ikke godkjennes: {c.hazards.join('; ')}</span>
+                ) : (
+                  <>
+                    <button className="btn approve" onClick={() => {
+                      const o: LakeOverride = {
+                        id: uid('ovr'), barrierKey: b.id, name: b.name, originalKind: b.kind as 'magasin' | 'innsjø', originalLabel: b.label, centroid, geometry: b.feature.geometry,
+                        scope: 'tur', tripDate: s.tripDate, reviewRequired: false, note: quickNote.trim() || '(godkjent uten notat)', active: true, createdAt: new Date().toISOString(),
+                        segment: { routeId: route.id, routeName: route.name, fromKm: +(c.fromD / 1000 - 0.2).toFixed(2), toKm: +(c.toD / 1000 + 0.2).toFixed(2) },
+                      };
+                      s.upsertOverride(o, `GODKJENT FOR MIN RUTE: ${b.name}, km ${(c.fromD / 1000).toFixed(1)}–${(c.toD / 1000).toFixed(1)}`);
+                    }}>✓ GODKJENN FOR MIN RUTE</button>
+                    <span className="small">kryssing {(c.fromD / 1000).toFixed(1)}–{(c.toD / 1000).toFixed(1)} km ({Math.round(c.lengthM)} m)</span>
+                  </>
+                )}
+              </div>
+            );
+          })}
+          <input id="quick-note" placeholder="Valgfritt notat (f.eks. «kjent kryssing ved innløpet»)" value={quickNote} onChange={(e) => setQuickNote(e.target.value)} />
+          <p className="small muted">Godkjenner bare denne kryssingen på denne turen ({s.tripDate}). Offisiell NVE-status endres ikke, og dammer/utløp/egne no-go-soner blokkerer fortsatt.</p>
+        </div>
+      )}
       <div className="kv small">
         <span>Klassifisering nå</span><b><Badge s={wc.status}>{wc.status === 'BRUKER' ? 'USER OVERRIDE' : wc.status}</Badge> {wc.text}</b>
         <span>Opprinnelig status</span><b>{b.label}</b>
@@ -122,8 +156,8 @@ export default function LakePanel({ id }: { id: string }) {
       )}
 
       {b.kind !== 'sone' && (
-        <div className="form1">
-          <h4>Legg til i whitelist</h4>
+        <details className="form1">
+          <summary><b>Avansert whitelist</b> (sesong, permanent, utløp, gjennomgang, egen strekning)</summary>
           <label>Type
             <select id="ovr-scope" value={scope} onChange={(e) => setScope(e.target.value as OverrideScope)}>
               <option value="tur">Kun denne turen ({s.tripDate})</option>
@@ -155,7 +189,7 @@ export default function LakePanel({ id }: { id: string }) {
           <label>Kilde / dokumentasjon (lenke)<input id="ovr-link" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" /></label>
           {err && <p className="err small">{err}</p>}
           <button className="btn" onClick={add}>✋ Legg til i whitelist</button>
-        </div>
+        </details>
       )}
     </div>
   );

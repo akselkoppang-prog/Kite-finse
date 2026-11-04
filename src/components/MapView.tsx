@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore } from '../state/store';
@@ -11,6 +11,7 @@ import { subgoals } from '../lib/subgoals';
 import { featureName } from '../lib/api/nve';
 import { categoryOf } from '../data/categories';
 import { cachedTileLayer } from '../lib/offline';
+import { SimLayer, DailyLayer } from './sim/SimPlayer';
 
 export const STATUS_COLOR = { GRØNN: '#22c55e', GUL: '#eab308', RØD: '#ef4444', GRÅ: '#94a3b8', BRUKER: '#2dd4bf' } as const;
 export const ROUTE_RED = '#ef4444';
@@ -21,6 +22,7 @@ const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt
 export default function MapView() {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map>();
+  const [mapObj, setMapObj] = useState<L.Map>();
   const groups = useRef<Record<string, L.LayerGroup>>({});
   const baseLayer = useRef<L.TileLayer>();
   const wmsLayers = useRef<Record<string, L.TileLayer.WMS | undefined>>({});
@@ -38,6 +40,7 @@ export default function MapView() {
     const m = L.map(el.current, { zoomControl: true }).setView([60.2, 8.0], 9);
     L.control.scale({ imperial: false }).addTo(m);
     map.current = m;
+    setMapObj(m);
     ['zones', 'water', 'alts', 'route', 'wind', 'steep', 'cross', 'places', 'camps', 'sub', 'markers', 'breaks', 'arrows', 'draft'].forEach((k) => (groups.current[k] = L.layerGroup().addTo(m)));
     const coordBox = new L.Control({ position: 'bottomleft' });
     coordBox.onAdd = () => {
@@ -212,7 +215,10 @@ export default function MapView() {
       .bindTooltip(`Hovedrute: ${esc(route.name)} – FORESLÅTT, ikke verifisert i terrenget`, { sticky: true })
       .addTo(g);
     const many = route.waypoints.length > 60;
+    // Store GPX-filer: tegn bare navngitte/kategoriserte punkter + hvert n-te som dragbare markører (ytelse)
+    const stride = route.waypoints.length > 400 ? Math.ceil(route.waypoints.length / 200) : 1;
     route.waypoints.forEach((w, i) => {
+      if (stride > 1 && !w.name && !w.category && i % stride !== 0 && i !== route.waypoints.length - 1 && s.selectedWp !== w.id) return;
       const cat = categoryOf(w.category, s.customCategories);
       if (cat && s.hiddenCategories.includes(cat.id)) return;
       const named = !!w.name;
@@ -385,15 +391,25 @@ export default function MapView() {
     g.clearLayers();
     if (!s.layers.camps) return;
     s.camps.forEach((c) => {
-      const mk = L.marker([c.lat, c.lon], { draggable: true, icon: L.divIcon({ className: '', html: `<div class="camp ${c.approved ? 'approved' : ''}">⛺<span>N${c.night}${c.approved ? ' ✓' : ''}</span></div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) });
+      const mk = L.marker([c.lat, c.lon], { draggable: true, icon: L.divIcon({ className: '', html: `<div class="camp ${c.approved ? 'approved' : ''} ${c.role === 'foretrukket' ? 'pref' : c.role === 'reserve' ? 'backup' : ''}">⛺<span>N${c.night}${c.role === 'foretrukket' ? '★' : c.role === 'reserve' ? 'R' : ''}${c.approved ? ' ✓' : ''}</span></div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) });
       mk.on('dragend', () => {
         const ll = mk.getLatLng();
         const st = useStore.getState();
         st.set({ camps: st.camps.map((x) => (x.id === c.id ? { ...x, lat: ll.lat, lon: ll.lng, source: 'manuell' } : x)) });
       });
-      mk.bindTooltip(`${esc(c.name)} – natt ${c.night} (${c.source}). ${c.approved ? 'Brukergodkjent (ikke befart av verktøyet).' : 'IKKE befart.'}`).addTo(g);
+      mk.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        useStore.getState().set({ selectedCamp: c.id, selectedWp: null, selectedMarker: null, selectedBarrier: null });
+      });
+      mk.bindTooltip(`${esc(c.name)} – natt ${c.night}${c.role ? ` (${c.role})` : ''} · ${c.source}. ${c.approved ? 'Brukergodkjent (ikke befart av verktøyet).' : 'IKKE befart.'} Klikk for å redigere.`).addTo(g);
     });
   }, [s.camps, s.layers.camps]);
 
-  return <div ref={el} className="map" />;
+  return (
+    <>
+      <div ref={el} className="map" />
+      <SimLayer map={mapObj} route={route?.waypoints} />
+      <DailyLayer map={mapObj} />
+    </>
+  );
 }

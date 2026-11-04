@@ -164,7 +164,7 @@ export function exportPlanJson(includeData = true): string {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(s)) {
     if (typeof v === 'function') continue;
-    if (['focus', 'editMode', 'draftZone', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'windPoints', 'tab'].includes(k)) continue;
+    if (['focus', 'editMode', 'draftZone', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'windPoints', 'tab', 'simPlay', 'dailyView', 'selectedCamp'].includes(k)) continue;
     if (!includeData && (CACHE_KEYS as readonly string[]).includes(k)) continue;
     out[k] = v;
   }

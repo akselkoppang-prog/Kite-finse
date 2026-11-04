@@ -141,7 +141,7 @@ export default function RoutePanel() {
               {c.hazards.map((h) => <div key={h} className="small err">⚠️ {h}</div>)}
               <div className="btns">
                 <button className="btn small" onClick={() => s.focusOn(c.entry.lat, c.entry.lon, 13)}>Vis</button>
-                {c.barrier.kind !== 'sone' && <button className="btn small" onClick={() => s.set({ selectedBarrier: c.barrier.id, selectedWp: null, selectedMarker: null })}>Detaljer / whitelist</button>}
+                {c.barrier.kind !== 'sone' && <button className="btn small" onClick={() => s.set({ selectedBarrier: c.barrier.id, selectedWp: null, selectedMarker: null })}>✓ Godkjenn / detaljer</button>}
                 <button
                   className="btn small"
                   onClick={() => {

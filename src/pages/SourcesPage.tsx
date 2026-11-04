@@ -4,6 +4,54 @@ import { SOURCES } from '../data/sources';
 import { onSourceStatus, sourceStatus } from '../lib/api/http';
 import { wmsLayers, type WmsLayer } from '../lib/api/nve';
 import { Badge, Card, fmtTime } from '../components/ui';
+import { runDiagnostics, type DiagResult } from '../lib/diagnostics';
+import { storageHealth } from '../state/store';
+import { elevCacheWarning } from '../lib/api/kartverket';
+
+function Diagnostics() {
+  const frost = useStore((s) => s.frostClientId);
+  const [res, setRes] = useState<DiagResult[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('kite.diag') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    const acc: DiagResult[] = [];
+    await runDiagnostics(frost, (r) => {
+      acc.push(r);
+      setRes([...acc]);
+    });
+    try {
+      localStorage.setItem('kite.diag', JSON.stringify(acc));
+    } catch {
+      /* */
+    }
+    setBusy(false);
+  };
+  return (
+    <Card title="Live-diagnose av alle integrasjoner" className="wide" right={<button className="btn" onClick={run} disabled={busy}>{busy ? 'Tester…' : 'Kjør alle tester nå'}</button>}>
+      <p className="small">Kjører <b>ekte</b> kall fra denne nettleseren mot Kartverket, NVE, MET og Varsom og kontrollerer svarformatet (feltnavn, koordinatrekkefølge, plausible verdier). Ingen testdata. Resultatet gjelder der du åpner appen – utviklingsmiljøet hadde ikke nettilgang til disse tjenestene.</p>
+      {!storageHealth.ok && <p className="err small">{storageHealth.message}</p>}
+      {elevCacheWarning && <p className="warn small">{elevCacheWarning}</p>}
+      {res.length === 0 && <p className="small muted">Ikke kjørt ennå.</p>}
+      <div className="diag">
+        {res.map((r) => (
+          <div key={r.id} className="diagrow">
+            <div><Badge s={r.ok ? 'GRØNN' : r.checks.length && r.checks[0].text.startsWith('Hoppet') ? 'GRÅ' : 'RØD'}>{r.ok ? 'OK' : r.checks[0]?.text.startsWith('Hoppet') ? 'HOPPET OVER' : 'FEIL'}</Badge> <b>{r.name}</b> <span className="muted small">{Math.round(r.ms)} ms · {fmtTime(r.at)}</span></div>
+            <ul className="small">
+              {r.checks.map((c, i) => <li key={i} className={c.ok ? '' : 'err'}>{c.ok ? '✓' : '✗'} {c.text}</li>)}
+              {r.error && <li className="err">✗ {r.error}</li>}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 function WmsConfigurator({ which, label, candidates }: { which: 'nve' | 'skred'; label: string; candidates: string[] }) {
   const s = useStore();
@@ -48,6 +96,7 @@ export default function SourcesPage() {
   const [lake, setLake] = useState(() => localStorage.getItem('kite.nveBase.lake') ?? '');
   return (
     <div className="page">
+      <Diagnostics />
       <Card title="Datakilder og status" className="wide">
         <p className="small">
           Alle kall går direkte fra nettleseren din til offentlige tjenester. Ingen data er simulert. Hvis en tjeneste feiler, vises den som feil/GRÅ – og analysene som avhenger av den blir blokkert eller markert.
@@ -55,7 +104,7 @@ export default function SourcesPage() {
         </p>
         <div className="tablewrap">
           <table className="tbl small">
-            <thead><tr><th>Kilde</th><th>Type</th><th>Brukes til</th><th>Status</th><th>Lisens</th><th>Notat fra research</th></tr></thead>
+            <thead><tr><th>Kilde</th><th>Type</th><th>Brukes til</th><th>Status nå</th><th>Siste OK</th><th>Datatid / art</th><th>Lisens</th><th>Notat fra research</th></tr></thead>
             <tbody>
               {Object.values(SOURCES).map((src) => {
                 const st = sourceStatus[src.id];
@@ -66,9 +115,12 @@ export default function SourcesPage() {
                     <td>{src.usedFor}</td>
                     <td>
                       <Badge s={st?.ok ? 'GRØNN' : st?.ok === false ? 'RØD' : 'GRÅ'}>{st?.ok ? 'OK' : st?.ok === false ? 'Feil' : 'Ikke kalt'}</Badge>
-                      <div>{fmtTime(st?.at)}</div>
-                      {st?.message && <div className="err">{st.message}</div>}
+                      <div>sist kalt {fmtTime(st?.at)}</div>
+                      {st?.ok === false && st?.message && <div className="err">{st.message}</div>}
+                      {src.needsKey && <div className="warn">Krever nøkkel</div>}
                     </td>
+                    <td>{fmtTime(st?.lastOkAt)}{st?.lastErrorAt && <div className="muted">siste feil {fmtTime(st.lastErrorAt)}</div>}</td>
+                    <td>{st?.dataTime ? fmtTime(st.dataTime) : '–'}<div className="muted">{st?.nature ?? (src.kind === 'kartfliser' || src.kind === 'WMS' ? 'kartdata' : src.kind === 'brukerdata' ? 'manuell' : '–')}</div></td>
                     <td>{src.license}</td>
                     <td>{src.researchNote}</td>
                   </tr>

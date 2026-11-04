@@ -3,7 +3,7 @@ import { useStore } from '../state/store';
 import { useActiveRoute, useDayPlan } from '../state/derived';
 import { forecast, windChill, frostClimate, type ClimateStat } from '../lib/api/met';
 import { subgoals } from '../lib/subgoals';
-import { addDays, daysBetween } from '../lib/sun';
+import { addDays, daysBetween, hourOf } from '../lib/sun';
 import { DIRS8, cumulative, pointAt } from '../lib/geo';
 import { Card, Kind, fmtTime } from './ui';
 
@@ -98,7 +98,7 @@ export function TripForecast() {
               <tbody>
                 {plan.days.map((d) => {
                   const f = fc[d.day];
-                  const rows = f?.rows.filter((r) => { const h = new Date(r.time); return r.time.slice(0, 10) === d.date && h.getUTCHours() >= 7 && h.getUTCHours() <= 17; }) ?? [];
+                  const rows = f?.rows.filter((r) => { const dt = new Date(r.time); const h = hourOf(dt) ?? -1; const localDate = dt.toLocaleDateString('sv-SE', { timeZone: 'Europe/Oslo' }); return localDate === d.date && h >= 8 && h <= 18; }) ?? [];
                   const avg = (k: 'windSpeed' | 'temp' | 'cloud' | 'fog') => { const v = rows.map((r) => r[k]).filter((x): x is number => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : undefined; };
                   const gust = Math.max(...rows.map((r) => r.windGust ?? -1));
                   const prec = rows.reduce((a, r) => a + (r.precip ?? 0), 0);

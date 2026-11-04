@@ -9,6 +9,7 @@ import { categoryOf } from '../data/categories';
 import { fmtClock } from '../lib/sun';
 import { DaylightBar } from '../components/Trip';
 import { Badge, Card, Kind } from '../components/ui';
+import { useSimSetup } from '../state/sim';
 
 const hm = (h: number) => `${Math.floor(h)} t ${String(Math.round((h % 1) * 60)).padStart(2, '0')} min`;
 const clock = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
@@ -37,6 +38,8 @@ export default function DayPlanPage() {
   const terrain = useTerrain(route);
   const check = useBarrierCheck(route);
   const plan = useDayPlan(route);
+  const setup = useSimSetup();
+  const physDays = useMemo(() => plan.days.map((d) => setup.run({ fromD: d.d0, toD: d.d1, startDate: d.date, startHour: s.sim.startHour, maxDays: 1 })), [plan.days, setup, s.sim.startHour]);
   const [dragD, setDragD] = useState<number | null>(null);
   const sc = s.scenarios.find((x) => x.id === s.scenarioId)!;
   const places = Object.values(s.places);
@@ -92,7 +95,8 @@ export default function DayPlanPage() {
 
   return (
     <div className="page">
-      <Card title="Snowkite-modell – hvor mange dager?" className="wide" right={<Kind k="beregnet" />}>
+      <Card title="Grovmodell – hvor mange dager? (andel brukbar vind)" className="wide" right={<Kind k="beregnet" />}>
+        <p className="small note">Dette er den enkle scenariomodellen. Den fysikkbaserte simuleringen (kite, vindretning og -styrke, kryss, time-for-time-vind) ligger i <button className="link" onClick={() => s.setTab('simulator')}>Ytelsessimulator</button> og vises også per dag under.</p>
         <p className="small">Målet er <b>3 dager</b>. Modellen regner fremdrift langs ruten etappe for etappe ut fra kurs mot vind fra <b>{s.windFrom}</b> (endres i Vær & vind), andel brukbar vind, gåstrekk (bratt terreng og sluttnedstigning), oppskytinger, navigasjon, værstans, tretthet og dagslys.</p>
         <div className="scen">
           {s.scenarios.map((x) => {
@@ -172,6 +176,8 @@ export default function DayPlanPage() {
                   <span>Total</span><b>{hm(d.totalH)} · {clock(d.startH)}–{clock(d.endH)}</b>
                   <span>Sol</span><b>opp {fmtClock(d.sun.sunrise)} · ned {fmtClock(d.sun.sunset)} · borgerlig skumring {fmtClock(d.sun.civilDusk)}</b>
                   <span>Dagslys igjen ved ankomst</span><b className={late ? 'err' : ''}>{d.daylightLeftH != null ? `${d.daylightLeftH >= 0 ? '' : '−'}${hm(Math.abs(d.daylightLeftH))} til solnedgang` : '–'}{late ? ' – for lite tid til leir' : ''}</b>
+                  <span>Fysikkmodell ({s.sim.manual.avg} m/s fra {s.sim.manual.dir}°)</span>
+                  <b>{physDays[i] ? (physDays[i]!.reachedD >= d.d1 - 50 ? `${hm((physDays[i]!.end - physDays[i]!.start) / 3600000)} · ankomst ${fmtClock(new Date(physDays[i]!.end))}` : <span className="err">rekker {((physDays[i]!.reachedD - d.d0) / 1000).toFixed(1)} av {((d.d1 - d.d0) / 1000).toFixed(1)} km før mørket</span>) : '–'}</b>
                   <span>Kiteforhold ({s.windFrom})</span><b><span className="dot" style={{ background: scoreColor(d.windScore) }}>{Math.round(d.windScore * 100)}</span> beregnet kurs-egnethet</b>
                 </div>
                 <DaylightBar sun={d.sun} startH={d.startH} endH={d.endH} />

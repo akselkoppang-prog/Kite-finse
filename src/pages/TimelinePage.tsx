@@ -4,6 +4,7 @@ import { Badge, Card, fmtTime } from '../components/ui';
 import { sourceStatus } from '../lib/api/http';
 import { SOURCES } from '../data/sources';
 import { TripCalendar, SunTable } from '../components/Trip';
+import SunExplorer from '../components/SunExplorer';
 import { addDays } from '../lib/sun';
 
 const PHASES: { id: string; when: string; items: string[] }[] = [
@@ -24,7 +25,8 @@ export default function TimelinePage() {
         <TripCalendar />
         <p className="small">Værprognose (MET) tilgjengelig fra ca. <b>{addDays(s.tripDate, -9)}</b>. Skredvarsel publiseres daglig 1. des–31. mai.</p>
       </Card>
-      <Card title="Sol og dagslys per dag (beregnet for etappens midtpunkt)" className="wide">
+      <SunExplorer />
+      <Card title="Soltabell per dag (etappens midtpunkt)" className="wide">
         <SunTable />
         <p className="small muted">Beregnet med SunCalc (astronomiske formler, ~1 min nøyaktighet) for datoen og koordinatene midt på hver dagsetappe. Tidssone Europe/Oslo – sommertid starter 28.03.2027.</p>
       </Card>

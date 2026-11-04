@@ -5,6 +5,7 @@ import { defaultWindow, evaluate, SNOW_MU, TERRAIN_ADD, type Goal, type Snow, ty
 import { DIRS8, DIR_DEG, angleDiff, uid } from '../lib/geo';
 import { Card, Kind } from '../components/ui';
 import type { Quiver } from '../types';
+import KiteSpecs from '../components/KiteSpecs';
 
 const STATUS_CLASS: Record<string, string> = { aktuell: 'GRØNN', grensetilfelle: 'GUL', 'for lite trekk': 'GRÅ', overpower: 'RØD' };
 
@@ -82,6 +83,8 @@ export default function KitePage() {
         </div>
       </Card>
 
+      <KiteSpecs />
+
       <Card title="Sammenlign quivers – vinddekning" className="wide" right={<Kind k="beregnet" />}>
         <div className="tablewrap">
           <table className="tbl small cov">
@@ -116,7 +119,7 @@ export default function KitePage() {
         <p className="small">Total last <b>{s.riderKg + s.pulkKg} kg</b>. Hovedretning ≈ SØ → vind fra {s.windFrom} gir kursvinkel <b>{Math.round(courseAngle)}°</b>.</p>
       </Card>
 
-      <Card title="Råd for valgte forhold" right={<label className="chk small"><input id="k-only" type="checkbox" checked={onlySelected} onChange={(e) => setOnlySelected(e.target.checked)} /> Kun min quiver</label>} className="wide">
+      <Card title="Hurtigråd (enkel modell – se Ytelsessimulator for fysikkmodellen)" right={<label className="chk small"><input id="k-only" type="checkbox" checked={onlySelected} onChange={(e) => setOnlySelected(e.target.checked)} /> Kun min quiver</label>} className="wide">
         {pool.length === 0 && <p className="small warn">Ingen kites valgt i quiveren.</p>}
         <div className="kites">
           {verdicts.map((v, i) => (
@@ -149,7 +152,7 @@ export default function KitePage() {
         <p className="small warn">Rangeringen er rådgivende. Vinduene er en forenklet modell (trekk ∝ areal × vind², last ∝ vekt × friksjon), ikke produsentdata og ikke sikkerhetsgrenser.</p>
       </Card>
 
-      <Card title="Sammenligning av kites" className="wide">
+      <Card title="Faglige vurderinger (sammendrag)" className="wide">
         <div className="tablewrap">
           <table className="tbl small">
             <thead>
@@ -160,7 +163,7 @@ export default function KitePage() {
                 <tr key={k.id} className={q.kiteIds.includes(k.id) ? 'sel' : ''}>
                   <td><b>{k.maker}</b> {k.name.replace(`${k.maker} `, '')}</td>
                   <td>{k.size} m²</td>
-                  <td><a href={k.makerUrl} target="_blank" rel="noreferrer">ikke hentet – se produsent</a></td>
+                  <td><a href={k.makerUrl} target="_blank" rel="noreferrer">se kitedatabasen over</a></td>
                   <td>{k.type}</td>
                   <td>{k.role}</td>
                   <td>{k.windChar}</td>
@@ -175,7 +178,7 @@ export default function KitePage() {
             </tbody>
           </table>
         </div>
-        <p className="small muted">Bare størrelse og modell er dokumentert (fra deg). Alle andre kolonner er <b>faglige vurderinger</b> – produsentsidene var ikke tilgjengelige fra utviklingsmiljøet. Legg inn egne erfaringer i notatfeltene.</p>
+        <p className="small muted">Kolonnene er <b>faglige vurderinger</b>. Dokumenterte spesifikasjoner med kilder står i kitedatabasen over. Ytelse per kite simuleres i «Ytelsessimulator».</p>
       </Card>
 
       <Card title="Rådgivende quiver-forslag" right={<Kind k="sjekk-selv" />}>
