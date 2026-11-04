@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore } from '../state/store';
-import { useActiveRoute, useBarrierCheck, useDayPlan, useTerrain, useWind } from '../state/derived';
+import { useActiveRoute, useBarrierCheck, useTerrain, useWind } from '../state/derived';
+import { useExpedition, updateDay } from '../state/expedition';
+import { DAY_COLORS, hhmm } from '../lib/sim/expedition';
 import { SOURCES } from '../data/sources';
 import { fmtCoord, fmtDM, nearestOnRoute, uid, cumulative, pointAt } from '../lib/geo';
 import { classify } from '../lib/analysis/terrain';
@@ -32,7 +34,7 @@ export default function MapView() {
   const check = useBarrierCheck(route);
   const terrain = useTerrain(route);
   const wind = useWind(route);
-  const plan = useDayPlan(route);
+  const exp = useExpedition();
 
   // --- init ---
   useEffect(() => {
@@ -91,6 +93,34 @@ export default function MapView() {
       const st = useStore.getState();
       const r = st.routes.find((x) => x.id === st.activeRouteId);
       const { lat, lng } = e.latlng;
+      if (st.editMode === 'none') {
+        // Hurtigmeny: legg til teltplass, notat eller rutepunkt der du klikket
+        const box = document.createElement('div');
+        box.className = 'clickmenu';
+        const btn = (txt: string, fn: () => void) => {
+          const b = document.createElement('button');
+          b.className = 'btn small';
+          b.textContent = txt;
+          b.onclick = () => {
+            fn();
+            m.closePopup();
+          };
+          box.appendChild(b);
+        };
+        btn('⛺ Legg til teltplass', () => {
+          const id = uid('camp');
+          const night = 1;
+          st.set({ camps: [...st.camps, { id, lat, lon: lng, name: `Teltplass ${st.camps.length + 1}`, night, source: 'manuell', createdAt: new Date().toISOString() }], selectedCamp: id, selectedWp: null, selectedMarker: null, selectedBarrier: null });
+        });
+        btn('📝 Notat / markør her', () => {
+          const id = uid('mk');
+          const now = new Date().toISOString();
+          st.set({ markers: [...st.markers, { id, lat, lon: lng, name: `Notat ${st.markers.length + 1}`, category: 'note', source: 'Klikket i kart', verification: 'uverifisert', createdAt: now, updatedAt: now }], selectedMarker: id, selectedWp: null, selectedBarrier: null, selectedCamp: null });
+        });
+        if (r) btn('📍 Sett inn rutepunkt', () => st.insertWaypoint(r.id, lat, lng));
+        L.popup({ closeButton: true, autoPan: true }).setLatLng(e.latlng).setContent(box).openOn(m);
+        return;
+      }
       if (st.editMode === 'add' && r) st.addWaypoint(r.id, lat, lng);
       else if (st.editMode === 'insert' && r) st.insertWaypoint(r.id, lat, lng);
       else if (st.editMode === 'zone') st.set({ draftZone: [...st.draftZone, { lat, lon: lng }] });
@@ -173,7 +203,7 @@ export default function MapView() {
         const nogo = z.kind === 'forbudt';
         const c = nogo ? '#ef4444' : '#eab308';
         L.polygon(z.ring.map((p) => [p.lat, p.lon]), { color: c, weight: 2, dashArray: '6 4', fillOpacity: nogo ? 0.9 : 0.2, className: nogo ? 'zone-nogo' : '' })
-          .bindPopup(`<b>${esc(z.name)}</b><br/>${nogo ? 'Forbudt sone – BLOKKERT (kan ikke overstyres)' : 'Usikker sone (advarsel)'}<br/><small>${esc(z.note ?? '')}</small>`)
+          .bindPopup(`<b>${esc(z.name)}</b><br/>${nogo ? 'Din no-go-sone – viktig advarsel' : 'Usikker sone (advarsel)'}<br/><small>${esc(z.note ?? '')}</small>`)
           .addTo(g);
       });
     if (s.draftZone.length) {
@@ -280,26 +310,38 @@ export default function MapView() {
     });
   }, [s.markers, s.layers.markers, s.selectedMarker, s.customCategories, s.hiddenCategories]);
 
-  // --- dagsskift (dra langs ruten) ---
+  // --- ekspedisjonsdager: farget strekning, dra-bart sluttflagg og vindpil per dag ---
   useEffect(() => {
     const g = groups.current.breaks;
     if (!g) return;
     g.clearLayers();
-    if (!route || !s.layers.dayBreaks) return;
+    if (!route || !s.layers.dayBreaks || !exp.days.length) return;
     const cum = cumulative(route.waypoints);
-    plan.breaks.forEach((d, i) => {
-      const p = pointAt(route.waypoints, cum, d);
-      const mk = L.marker([p.lat, p.lon], { draggable: true, zIndexOffset: 500, icon: L.divIcon({ className: '', html: `<div class="daybreak">🏁 Slutt dag ${i + 1}</div>`, iconSize: [96, 22], iconAnchor: [8, 22] }) });
+    exp.days.forEach((d, i) => {
+      if (d.endD <= d.startD) return;
+      const color = DAY_COLORS[i % DAY_COLORS.length];
+      const pts: [number, number][] = [];
+      for (let x = d.startD; x < d.endD; x += 300) { const q = pointAt(route.waypoints, cum, x); pts.push([q.lat, q.lon]); }
+      const e = pointAt(route.waypoints, cum, d.endD);
+      pts.push([e.lat, e.lon]);
+      L.polyline(pts, { color, weight: 7, opacity: 0.85, interactive: false }).addTo(g);
+      // vindpil for dagen (ditt scenario) midt på strekningen
+      const mid = pointAt(route.waypoints, cum, (d.startD + d.endD) / 2);
+      const w = exp.plan.days[i]?.wind;
+      if (w) L.marker([mid.lat, mid.lon], { interactive: true, icon: L.divIcon({ className: '', html: `<div class="daywind" style="border-color:${color}"><span style="transform:rotate(${(w.dir + 180) % 360 - 90}deg)">➤</span><b>${w.avg}</b></div>`, iconSize: [42, 42], iconAnchor: [21, 21] }) })
+        .bindTooltip(`Dag ${d.day}: vind fra ${Math.round(w.dir)}°, ${w.avg} m/s (${w.min}–${w.max}, kast ${w.gust}) – ${exp.plan.days[i].windMode === 'manuell' ? 'ditt scenario, ikke prognose' : 'værmelding'}`)
+        .addTo(g);
+      const last = i === exp.days.length - 1 && d.remainingKm <= 0.05;
+      if (last) return;
+      const mk = L.marker([e.lat, e.lon], { draggable: true, zIndexOffset: 600, icon: L.divIcon({ className: '', html: `<div class="dayend" style="background:${color}">🏁 Dag ${d.day} · ${hhmm(d.arrival)}</div>`, iconSize: [110, 24], iconAnchor: [10, 24] }) });
       mk.on('dragend', () => {
         const ll = mk.getLatLng();
         const near = nearestOnRoute(route.waypoints, { lat: ll.lat, lon: ll.lng });
-        const nb = [...plan.breaks];
-        nb[i] = near.d;
-        useStore.getState().setDayBreaks(route.id, nb);
+        updateDay(i, { target: { mode: 'stopp', stopD: near.d }, campId: undefined });
       });
-      mk.bindTooltip(`Dagsskift ${i + 1} ved ${(d / 1000).toFixed(1)} km – dra langs ruten for å flytte`).addTo(g);
+      mk.bindTooltip(`Slutt dag ${d.day}: ${(d.endD / 1000).toFixed(1)} km, ankomst ${hhmm(d.arrival)}. Dra langs ruten for å velge ditt eget stopp.`).addTo(g);
     });
-  }, [route, plan.breaks, s.layers.dayBreaks]);
+  }, [route, exp.days, exp.plan, s.layers.dayBreaks]);
 
   // --- vind-egnethet ---
   useEffect(() => {

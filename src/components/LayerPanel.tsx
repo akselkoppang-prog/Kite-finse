@@ -13,7 +13,7 @@ const ITEMS: [keyof LayerToggles, string][] = [
   ['camps', 'Teltplasser'],
   ['zones', 'Egne soner (rød skravur = no-go)'],
   ['markers', 'Egne markører / notater'],
-  ['dayBreaks', 'Dagsskift (🏁)'],
+  ['dayBreaks', 'Dagene (farger, 🏁 og vind per dag)'],
   ['windArrows', 'Vindpiler (MET)'],
   ['nveWms', 'NVE Vannkraft WMS'],
   ['skredWms', 'NVE Bratthet/skred WMS'],

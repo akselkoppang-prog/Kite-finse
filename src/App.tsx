@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useStore, type Tab } from './state/store';
-import { useActiveRoute, useBarrierCheck, useProfile, useWind } from './state/derived';
 import { loadInitialGpx } from './lib/actions';
 import MapView from './components/MapView';
 import LayerPanel from './components/LayerPanel';
-import RoutePanel from './components/RoutePanel';
 import ElevationProfile from './components/ElevationProfile';
 import SubgoalTable from './components/SubgoalTable';
 import CompareTable from './components/CompareTable';
 import WindPage from './pages/WindPage';
 import KitePage from './pages/KitePage';
-import SafetyPage, { useAcceptance } from './pages/SafetyPage';
+import SafetyPage from './pages/SafetyPage';
 import DayPlanPage from './pages/DayPlanPage';
 import TimelinePage from './pages/TimelinePage';
 import SourcesPage from './pages/SourcesPage';
@@ -18,55 +16,42 @@ import OverridesPage from './pages/OverridesPage';
 import GearPage from './pages/GearPage';
 import LakePanel from './components/LakePanel';
 import WaypointPanel from './components/WaypointPanel';
-import { TripSummary } from './components/Trip';
-import { KITES } from './data/kites';
 import SimulatorPage from './pages/SimulatorPage';
 import ModelPage from './pages/ModelPage';
 import CampPanel from './components/CampPanel';
 import { SimPlayer } from './components/sim/SimPlayer';
 import StoragePage from './pages/StoragePage';
+import PlannerPage from './pages/PlannerPage';
+import WeatherKitePage from './pages/WeatherKitePage';
+import OverviewPanel from './components/OverviewPanel';
+import { ExpeditionProvider, useExpedition } from './state/expedition';
+import { useWarnings } from './lib/warnings';
+import { hhmm } from './lib/sim/expedition';
 import { SaveIndicator, SaveBanners } from './components/SaveStatus';
-import { Badge } from './components/ui';
-import { fmtKm } from './lib/geo';
 
-const TABS: [Tab, string][] = [
-  ['kart', 'Kart & rute'],
-  ['simulator', 'YTELSESSIMULATOR'],
-  ['vind', 'Vær & vind'],
-  ['kite', 'Kite-quiver'],
-  ['sikkerhet', 'Sikkerhet'],
-  ['dagplan', 'Dagplan'],
-  ['overstyring', 'Overstyringer'],
-  ['utstyr', 'Utstyr & offline'],
-  ['tidslinje', 'Kalender'],
-  ['modell', 'Modell & kalibrering'],
-  ['kilder', 'Datakilder & diagnose'],
-  ['lagring', 'Innstillinger / Lagring'],
+type Main = 'oversikt' | 'plan' | 'vaerkite' | 'utstyr' | 'innstillinger';
+const SECTIONS: { id: Main; label: string; short?: string; icon: string; subs: [Tab, string][] }[] = [
+  { id: 'oversikt', label: 'Oversikt', icon: '🗺️', subs: [['oversikt', 'Kart og rute']] },
+  { id: 'plan', label: 'Dagplan', icon: '📅', subs: [['plan', 'Dagene'], ['tidslinje', 'Kalender og sol'], ['dagplan', 'Avansert dagsfordeling']] },
+  { id: 'vaerkite', label: 'Vær & kite', icon: '🪁', subs: [['vaerkite', 'Kite og vind'], ['vind', 'Værmelding'], ['simulator', 'Simulator'], ['kite', 'Kitedatabase']] },
+  { id: 'utstyr', label: 'Utstyr & planlegging', short: 'Utstyr', icon: '🎒', subs: [['utstyr', 'Utstyr og mat'], ['sikkerhet', 'Sikkerhet'], ['overstyring', 'Vann-godkjenninger']] },
+  { id: 'innstillinger', label: 'Innstillinger', short: 'Oppsett', icon: '⚙️', subs: [['lagring', 'Lagring og backup'], ['kilder', 'Datakilder'], ['modell', 'Modell og kalibrering']] },
 ];
+const mainOf = (t: Tab): Main => (t === 'kart' ? 'oversikt' : SECTIONS.find((s) => s.subs.some(([x]) => x === t))?.id ?? 'oversikt');
 
-function Overview() {
-  const route = useActiveRoute();
-  const { stats } = useProfile(route);
-  const check = useBarrierCheck(route);
-  const { summary } = useWind(route);
-  const windFrom = useStore((s) => s.windFrom);
-  const { accepted } = useAcceptance();
+function HeaderSummary() {
+  const { plan, days } = useExpedition();
+  const warnings = useWarnings();
   const tripDate = useStore((s) => s.tripDate);
-  const tripDays = useStore((s) => s.tripDays);
-  const quiver = useStore((s) => s.quivers.find((q) => q.id === s.activeQuiverId));
   const setTab = useStore((s) => s.setTab);
+  const done = days.find((d) => d.remainingKm <= 0.05);
+  const imp = warnings.filter((w) => w.level === 'viktig' && !w.ack).length;
+  const adv = warnings.filter((w) => w.level === 'advarsel' && !w.ack).length;
   return (
-    <div className="overview">
-      <span className="ov"><span className="muted">Tur</span> <b>{tripDate}</b> <span className="muted">· {tripDays} d</span></span>
-      <button className="ov link" onClick={() => setTab('kite')} title="Endre quiver">
-        <span className="muted">Kites</span> <b>{KITES.filter((k) => quiver?.kiteIds.includes(k.id)).map((k) => `${k.size}${quiver?.primary === k.id ? '★' : ''}`).join(' · ') || '–'}</b>
-      </button>
-      <span className="ov"><span className="muted">Rute</span> <b>{route?.name ?? '–'}</b></span>
-      <span className="ov"><span className="muted">Distanse</span> <b>{fmtKm(stats.total)}</b></span>
-      <span className="ov"><span className="muted">↑</span> <b>{Math.round(stats.up)} m</b> <span className="muted">↓</span> <b>{Math.round(stats.down)} m</b></span>
-      <span className="ov"><span className="muted">Vann</span> <Badge s={check.status} /></span>
-      <span className="ov"><span className="muted">Vind {windFrom}</span> <b>{Math.round(summary.good * 100)} %</b> <span className="muted">gunstig</span></span>
-      <span className="ov"><span className="muted">Ruteaksept</span> <Badge s={accepted ? 'GUL' : 'RØD'}>{accepted ? 'OK for planlegging' : 'Blokkert'}</Badge></span>
+    <div className="hsum">
+      <button className="hs" onClick={() => setTab('plan')}>📅 {new Date(`${tripDate}T12:00:00`).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })} · {plan.days.length} dager</button>
+      <button className="hs" onClick={() => setTab('plan')}>{done ? `🏁 Rjukan dag ${done.day} kl. ${hhmm(done.arrival)}` : `⏳ ${days[days.length - 1]?.remainingKm.toFixed(0) ?? '–'} km igjen`}</button>
+      {(imp > 0 || adv > 0) && <button className="hs warnhs" onClick={() => setTab('oversikt')}>⚠️ {imp ? `${imp} viktige · ` : ''}{adv} advarsler</button>}
     </div>
   );
 }
@@ -78,11 +63,15 @@ export default function App() {
   const selBar = useStore((s) => s.selectedBarrier);
   const selCamp = useStore((s) => s.selectedCamp);
   const setTab = useStore((s) => s.setTab);
-  const [side, setSide] = useState(window.innerWidth > 900);
+  const [side, setSide] = useState(true);
+  const main = mainOf(tab);
+  const section = SECTIONS.find((x) => x.id === main)!;
+  const isMap = tab === 'kart' || tab === 'oversikt';
   useEffect(() => {
     loadInitialGpx().catch((e) => console.error('GPX', e));
   }, []);
   return (
+    <ExpeditionProvider>
     <div className="app">
       <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
         <defs>
@@ -101,29 +90,28 @@ export default function App() {
           </div>
           <SaveIndicator />
         </div>
-        <nav className="tabs">
-          {TABS.map(([t, l]) => (
-            <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-              {l}
+        <nav className="mainnav" aria-label="Hovedmeny">
+          {SECTIONS.map((x) => (
+            <button key={x.id} className={main === x.id ? 'on' : ''} onClick={() => setTab(x.subs[0][0])}>
+              <span className="mn-ic">{x.icon}</span><span className="mn-l">{x.label}</span><span className="mn-s">{x.short ?? x.label}</span>
             </button>
           ))}
         </nav>
       </header>
-      <Overview />
-      <div className="banner">
-        Alle ruter er <b>FORSLAG – ikke verifisert i terrenget</b>. «Brukergodkjent» er din egen vurdering, ikke uavhengig verifisering. Verktøyet erstatter ikke skredvarsel, isvurdering eller lokalkunnskap.
+      <div className="subbar">
+        {section.subs.length > 1 && (
+          <nav className="subnav" aria-label="Undermeny">
+            {section.subs.map(([t, l]) => <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{l}</button>)}
+          </nav>
+        )}
+        <HeaderSummary />
       </div>
       <SaveBanners />
       <main className={`main tab-${tab}`}>
-        <div className={`mapwrap ${tab === 'kart' ? '' : 'hidden'}`}>
+        <div className={`mapwrap ${isMap ? '' : 'hidden'}`}>
           <div className={`side ${side ? 'open' : ''}`}>
-            <button className="btn small side-toggle" onClick={() => setSide(!side)}>{side ? '◂ Skjul panel' : '▸ Ruteplanlegger'}</button>
-            {side && (
-              <>
-                <TripSummary compact />
-                <RoutePanel />
-              </>
-            )}
+            <button className="btn small side-toggle" onClick={() => setSide(!side)}>{side ? '◂ Skjul panel' : '▸ Vis oversikt'}</button>
+            {side && <OverviewPanel />}
           </div>
           <div className="mapcol">
             <div className="mapbox">
@@ -138,12 +126,15 @@ export default function App() {
             <ElevationProfile />
           </div>
         </div>
-        {tab === 'kart' && (
-          <div className="below">
+        {isMap && (
+          <details className="below techdetails">
+            <summary>Tekniske detaljer: delmål og sammenligning av ruter</summary>
             <SubgoalTable />
             <CompareTable />
-          </div>
+          </details>
         )}
+        {tab === 'plan' && <PlannerPage />}
+        {tab === 'vaerkite' && <WeatherKitePage />}
         {tab === 'vind' && <WindPage />}
         {tab === 'kite' && <KitePage />}
         {tab === 'sikkerhet' && <SafetyPage />}
@@ -160,5 +151,6 @@ export default function App() {
         Kart © Kartverket (CC BY 4.0) · Hydrologi © NVE · Vær © MET Norge · Skredvarsel © NVE/Varsom. Data hentes direkte fra kildene i nettleseren.
       </footer>
     </div>
+    </ExpeditionProvider>
   );
 }

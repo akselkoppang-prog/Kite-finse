@@ -102,6 +102,8 @@ export interface Camp extends LatLon {
   note?: string;
   approved?: boolean;
   role?: 'foretrukket' | 'reserve';
+  description?: string;
+  assessment?: string;
   notes?: string;
   attachments?: Attachment[];
   createdAt?: string;

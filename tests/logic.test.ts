@@ -36,7 +36,7 @@ const bars = buildBarriers([], [poly], [], {});
 const cr = findCrossings(route, bars);
 ok(bars[0].id === 'lake_1' && cr.length === 1, 'stabil nøkkel + kryssing funnet');
 let ev = evaluateCrossings(cr, [], { routeId: 'r', tripDate: '2027-03-25', dams: [] });
-ok(ev[0].blocking && ev[0].label === 'BLOKKERT', 'uten whitelist: blokkert');
+ok(ev[0].blocking && ev[0].label === 'VIKTIG', 'uten whitelist: blokkert');
 const ovr = { ...base, scope: 'permanent' as const };
 ev = evaluateCrossings(cr, [ovr], { routeId: 'r', tripDate: '2027-03-25', dams: [] });
 ok(!ev[0].blocking && ev[0].label === 'BRUKERGODKJENT' && ev[0].barrier.status === 'RØD', 'whitelist: ikke blokkert, men NVE-status uendret (RØD)');

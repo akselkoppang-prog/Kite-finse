@@ -21,22 +21,25 @@ Krever Node 18+. Ingen API-nøkler trengs (per nov. 2026).
 **GitHub Pages:** workflowen `.github/workflows/pages.yml` bygger og publiserer ved push til `main`.
 Slå på Pages i repoets innstillinger (Settings → Pages → Source: GitHub Actions).
 
-## Arbeidsflyt
+## Versjon 5 – enkel på overflaten
 
-1. **Kart & rute → Hent ekte data**
-   1. Hent hytter/steder (Kartverket stedsnavn-API) → lager tre alternative rutekorridorer.
-   2. Last regulerte magasiner (NVE Vannkraft, ArcGIS REST).
-   3. Finn alle vann ruten krysser (NVE Innsjødatabase).
-   4. Terrenganalyse (Kartverket DTM): helning, rygger/daler og le for alle vindretninger.
-2. Se kryssinger → **Foreslå omvei** (lager en ny rute rundt barrieren) → kjør steg 3–4 på nytt.
-3. Dra punktene i kartet, sett inn punkter, tegn forbudte/usikre soner og legg til teltplasser.
-4. **Vær & vind**: velg vindretning og se kurs-/le-analyse og hvordan rutene rangeres. Henter MET-prognose.
-5. **Kite-quiver**: velg vind, kast, snø, pulk og terreng → begrunnet kiterangering.
-6. **Sikkerhet**: ruteaksept, vannregister, Varsom-skredvarsel, logistikk og sjekkliste.
-7. **Dagplan**: scenario A/B/C, dagsetapper og beregnede teltplass-kandidater per natt.
-8. Eksporter GPX (rute + teltplasser) eller lagre hele planen som JSON.
+Fem hovedseksjoner (avanserte verktøy ligger i undermenyer og sammenleggbare felt):
 
-Planen lagres automatisk i nettleseren (localStorage).
+| Seksjon | Innhold |
+|---|---|
+| 🗺️ **Oversikt** | Kartet med dagene i egne farger, 🏁 sluttpunkt og vindpil per dag. Sammendrag, dagliste og varsler. Klikk i kartet → *Legg til teltplass / notat / rutepunkt*. Rutedata og NVE-henting under «Rute og data». |
+| 📅 **Dagplan** | Ett kort per dag: avreise, aktiv kitetid, pauser, fart, dagens mål (så langt planen rekker / bestemt distanse / mitt stopp), kite og vind. Resultat: fremdrift langs ruten vs. teoretisk distanse, ankomst med usikkerhet, dagslys, gjenstående km, overnatting. 2–5 dager eller flere. Varianter (f.eks. «dag 1 = 35/50/60 km») lagres separat og sammenlignes – hovedplanen overskrives aldri. Kalender/sol og den gamle avanserte dagsfordelingen ligger som underfaner. |
+| 🪁 **Vær & kite** | Hvilke kites du tar med (alternativer – du bruker én om gangen), vindområde per kite med dagenes vind, kite per dag, egne vindgrenser. Værmelding, simulator og kitedatabase som underfaner. |
+| 🎒 **Utstyr & planlegging** | Utstyr og mat, sikkerhet, vann-godkjenninger. |
+| ⚙️ **Innstillinger** | Lagring og backup, datakilder, modell og kalibrering. |
+
+**Vind per dag** er uavhengig: *Mitt scenario* (manuelt), *Værmelding* (MET, bare når datoen er innenfor ~9 døgn) eller *Værmelding + justering*. Et manuelt scenario vises aldri som prognose.
+
+**Varsler er råd, ikke sperrer.** Tre nivåer – *Informasjon*, *Advarsel*, *Viktig advarsel*. Alt kan planlegges og simuleres uansett. «Merk som vurdert» lagrer din egen vurdering (f.eks. «Vurdert – jeg kjenner området») med dato; den vises som *VURDERT AV DEG* og er aldri en offisiell kontroll.
+
+**Teltplasser**: navn, beskrivelse, din vurdering, notater, bilder, foretrukket/reserve, flytt ved å dra, slett. «Bruk som overnatting etter dag N» setter dagens stopp; forventet ankomst vises fra planen. Sletter du en teltplass, beholdes stoppet ditt i dagplanen.
+
+Tester: `npm test` (logikk, simulering, lagring) + Playwright-skript for nettleseren (v5: 42 sjekker – 3-dagersplan, avreise/fart/timer, 50 km dag 1 med 🏁 i kartet, egen vind for dag 2, kite per dag, varianter, teltplass via kartklikk, beskrivelser, vurderte varsler, dra 🏁, reload, iPad stående/liggende og mobil uten horisontal scroll).
 
 ## Versjon 4 – lagring i IndexedDB (rettet «Nettleserlagringen er full»)
 

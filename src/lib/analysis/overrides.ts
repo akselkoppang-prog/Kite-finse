@@ -32,7 +32,7 @@ export interface CrossingEval extends Crossing {
   /** Farer som en overstyring IKKE fjerner */
   hazards: string[];
   blocking: boolean;
-  label: 'BLOKKERT' | 'BRUKERGODKJENT' | 'ADVARSEL';
+  label: 'VIKTIG' | 'BRUKERGODKJENT' | 'ADVARSEL';
 }
 
 export function evaluateCrossings(
@@ -66,7 +66,7 @@ export function evaluateCrossings(
     const overrideOk = !!applicable && (st === 'aktiv') && c.barrier.kind !== 'sone';
     const red = c.barrier.status === 'RØD';
     const blocking = red && (!overrideOk || hazards.length > 0);
-    const label = blocking ? 'BLOKKERT' : overrideOk ? 'BRUKERGODKJENT' : 'ADVARSEL';
+    const label = blocking ? 'VIKTIG' : overrideOk ? 'BRUKERGODKJENT' : 'ADVARSEL';
     return { ...c, override: applicable, overrideState: st, hazards, blocking, label };
   });
 }

@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import type { DataKind, Status } from '../types';
 
-const BADGE_TEXT: Record<Status, string> = { GRØNN: 'VERIFISERT', GUL: 'ADVARSEL', RØD: 'BLOKKERT', GRÅ: 'INGEN DATA', BRUKER: 'BRUKERGODKJENT' };
+const BADGE_TEXT: Record<Status, string> = { GRØNN: 'VERIFISERT', GUL: 'ADVARSEL', RØD: 'VIKTIG', GRÅ: 'INGEN DATA', BRUKER: 'BRUKERGODKJENT' };
 
-/** Statusmerke. Standardtekst: VERIFISERT / ADVARSEL / BLOKKERT / INGEN DATA / BRUKERGODKJENT. */
+/** Statusmerke. Standardtekst: VERIFISERT / ADVARSEL / VIKTIG / INGEN DATA / BRUKERGODKJENT. */
 export function Badge({ s, children }: { s: Status; children?: ReactNode }) {
   return <span className={`badge b-${s}`} title={s === 'BRUKER' ? 'Din egen godkjenning – ikke uavhengig verifisert' : undefined}>{children ?? BADGE_TEXT[s]}</span>;
 }

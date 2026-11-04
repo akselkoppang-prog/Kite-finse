@@ -158,7 +158,7 @@ export function TripSummary({ compact = false }: { compact?: boolean }) {
   const unresolved = items.filter((i) => i.blocking).length + check.bandWarnings.length + pendingReview;
   const kname = (id?: string) => KITES.find((k) => k.id === id);
   return (
-    <Card title="Turoversikt" right={<Badge s={accepted ? 'GUL' : 'RØD'}>{accepted ? 'Datakontroller OK' : 'Blokkert'}</Badge>} className={compact ? '' : 'wide'}>
+    <Card title="Turoversikt" right={<Badge s={accepted ? 'GUL' : 'RØD'}>{accepted ? 'Datakontroller OK' : 'Viktige punkter'}</Badge>} className={compact ? '' : 'wide'}>
       <div className="summary">
         <div><span>Avreise</span><b>{s.tripDate}</b></div>
         <div><span>Dager</span><b>{s.tripDays}</b></div>

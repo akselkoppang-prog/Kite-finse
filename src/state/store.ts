@@ -9,6 +9,7 @@ import type { SimResult } from '../lib/sim/route';
 import type { CalibTrack } from '../lib/sim/calibration';
 import type { SpecValue, KiteModel } from '../data/kiteSpecs';
 import { majorChange } from '../storage/hooks';
+import { examplePlan, type PlanScenario } from '../lib/sim/expedition';
 import { DEFAULT_PACKING, type PackItem } from '../data/packing';
 import type { Dir8 } from '../lib/geo';
 import type { NveHydro, PolyFeature } from '../lib/api/nve';
@@ -16,7 +17,7 @@ import type { TerrainAnalysis } from '../lib/analysis/terrain';
 import type { Snow, Terrain, Goal } from '../lib/analysis/kite';
 import { uid } from '../lib/geo';
 
-export type Tab = 'kart' | 'simulator' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder' | 'modell' | 'lagring';
+export type Tab = 'kart' | 'simulator' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder' | 'modell' | 'lagring' | 'oversikt' | 'plan' | 'vaerkite';
 
 export interface SimUI {
   startDay: number;
@@ -120,6 +121,9 @@ export interface State {
   simPlay: { result: SimResult | null; t: number; playing: boolean; rate: number; runAt?: string };
   dailyView: { lat: number; lon: number; cands: DailyCand[] } | null;
   selectedCamp: string | null;
+  plans: PlanScenario[];
+  activePlanId: string;
+  compareIds: string[];
 
   set: (p: Partial<State>) => void;
   setTab: (t: Tab) => void;
@@ -151,7 +155,7 @@ function pushHist(h: HistoryEntry[], kind: HistoryEntry['kind'], text: string): 
 
 export const useStore = create<State>()(
     (set, get) => ({
-      tab: 'kart',
+      tab: 'oversikt',
       routes: [],
       activeRouteId: null,
       places: {},
@@ -234,6 +238,9 @@ export const useStore = create<State>()(
       simPlay: { result: null, t: 0, playing: false, rate: 5 },
       dailyView: null,
       selectedCamp: null,
+      plans: [examplePlan()],
+      activePlanId: 'plan-main',
+      compareIds: [],
 
       set: (p) => set(p),
       setTab: (tab) => set({ tab }),

@@ -43,7 +43,7 @@ export function useAcceptance() {
   const items: { text: string; status: Status; blocking: boolean }[] = [
     { text: 'Regulerte magasiner lastet (NVE)', status: check.hydroAt ? 'GRØNN' : 'GRÅ', blocking: !check.hydroAt },
     { text: 'Alle innsjøer langs denne ruteversjonen hentet (NVE)', status: check.lakesAt ? 'GRØNN' : 'GRÅ', blocking: !check.lakesAt },
-    { text: `Ingen blokkerende kryssing av regulerte / ikke-verifiserte vann, dammer eller forbudte soner (${check.blocking.length} funnet)`, status: check.blocking.length ? 'RØD' : check.waterChecked ? 'GRØNN' : 'GRÅ', blocking: check.blocking.length > 0 || !check.waterChecked },
+    { text: `Ingen viktige kryssinger av regulerte / ikke-verifiserte vann, dammer eller forbudte soner (${check.blocking.length} funnet)`, status: check.blocking.length ? 'RØD' : check.waterChecked ? 'GRØNN' : 'GRÅ', blocking: check.blocking.length > 0 || !check.waterChecked },
     ...(check.userApproved.length ? [{ text: `${check.userApproved.length} kryssing(er) godkjent av deg (whitelist) – IKKE uavhengig verifisert: ${check.userApproved.map((c) => c.barrier.name).join(', ')}`, status: 'BRUKER' as Status, blocking: false }] : []),
     ...(overridesPending ? [{ text: `${overridesPending} overstyring(er) krever gjennomgang før avreise`, status: 'GUL' as Status, blocking: false }] : []),
     {
@@ -103,12 +103,12 @@ export default function SafetyPage() {
 
   return (
     <div className="page">
-      <Card title="Ruteaksept – aktiv rute" right={<Badge s={accepted ? 'GUL' : 'RØD'}>{accepted ? 'Kan aksepteres for videre planlegging' : 'BLOKKERT'}</Badge>} className="wide">
-        <p className="small"><b>{route?.name ?? 'Ingen rute'}</b>. Aksept betyr kun at kjente datakontroller er bestått – ikke at ruten er trygg.</p>
+      <Card title="Ruteaksept – aktiv rute" right={<Badge s={accepted ? 'GUL' : 'RØD'}>{accepted ? 'Datakontroller bestått' : 'Viktige punkter å se på'}</Badge>} className="wide">
+        <p className="small"><b>{route?.name ?? 'Ingen rute'}</b>. Dette er råd, ikke sperrer – du kan planlegge videre uansett. Bestått betyr kun at kjente datakontroller er ok – ikke at ruten er trygg.</p>
         <ul className="gate">
           {items.map((i) => (
             <li key={i.text}>
-              <Badge s={i.status} /> {i.text} {i.blocking && <b className="err">← blokkerer</b>}
+              <Badge s={i.status} /> {i.text} {i.blocking && <b className="warn">← se på dette</b>}
             </li>
           ))}
         </ul>

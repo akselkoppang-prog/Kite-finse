@@ -5,6 +5,8 @@ import { evaluateCamp } from '../lib/analysis/camps';
 import { dirName, fmtCoord, fmtDM, nearestOnRoute, uid } from '../lib/geo';
 import { cachedElevation } from '../lib/api/kartverket';
 import { Badge } from './ui';
+import { useExpedition, updateDay } from '../state/expedition';
+import { hhmm } from '../lib/sim/expedition';
 import { AttachmentImg } from './SaveStatus';
 import { putImage } from '../storage/blobs';
 import { releaseImage } from '../storage/backup';
@@ -19,6 +21,7 @@ export default function CampPanel({ id }: { id: string }) {
   const check = useBarrierCheck(route);
   const terrain = useTerrain(route);
   const [confirmDel, setConfirmDel] = useState(false);
+  const exp = useExpedition();
   const c = s.camps.find((x) => x.id === id);
   if (!c) return null;
   const upd = (p: Partial<Camp>) => s.set({ camps: s.camps.map((x) => (x.id === id ? { ...x, ...p, updatedAt: new Date().toISOString() } : x)) });
@@ -35,6 +38,28 @@ export default function CampPanel({ id }: { id: string }) {
       </header>
       <div className="form1">
         <label>Navn<input id="camp-name" value={c.name} onChange={(e) => upd({ name: e.target.value })} /></label>
+        <label>Beskrivelse<textarea id="camp-desc" rows={2} value={c.description ?? ''} placeholder="F.eks. le bak morenerygg, god snø til smelting" onChange={(e) => upd({ description: e.target.value })} /></label>
+        {(() => {
+          const di = exp.plan.days.findIndex((d) => d.campId === c.id);
+          const out = di >= 0 ? exp.days[di] : undefined;
+          return (
+            <div className="campplan small">
+              {out ? <>⛺ Overnatting etter <b>dag {di + 1}</b> · forventet ankomst <b>{hhmm(out.arrival)}</b> ({out.forcedStop ? 'ditt valg – lenger enn modellen rekker' : 'etter planen'})</> : <span className="muted">Ikke valgt som overnatting i dagplanen.</span>}
+              <div className="row">
+                <select id="camp-useday" value="" onChange={(e) => {
+                  const i = +e.target.value;
+                  if (!route) return;
+                  const d = nearestOnRoute(route.waypoints, c).d;
+                  s.set({ camps: s.camps.map((x) => (x.id === id ? { ...x, night: i + 1, role: 'foretrukket' } : x.night === i + 1 && x.role === 'foretrukket' ? { ...x, role: 'reserve' } : x)) });
+                  updateDay(i, { campId: id, target: { mode: 'stopp', stopD: d } });
+                }}>
+                  <option value="">Bruk som overnatting etter dag …</option>
+                  {exp.plan.days.slice(0, -1).map((_, i) => <option key={i} value={i}>Dag {i + 1}</option>)}
+                </select>
+              </div>
+            </div>
+          );
+        })()}
         <div className="row">
           <label>Natt<select id="camp-night" value={c.night} onChange={(e) => upd({ night: +e.target.value })}>{Array.from({ length: Math.max(s.tripDays, 6) }, (_, i) => <option key={i} value={i + 1}>Natt {i + 1}</option>)}</select></label>
           <label>Rolle<select id="camp-role" value={c.role ?? ''} onChange={(e) => {
@@ -54,6 +79,7 @@ export default function CampPanel({ id }: { id: string }) {
         </div>
         {ev.flags.map((f) => <div key={f} className="small warn">⚠️ {f}</div>)}
         <label className="chk"><input id="camp-ok" type="checkbox" checked={!!c.approved} onChange={(e) => upd({ approved: e.target.checked })} /> Godkjent av meg <Badge s="BRUKER" /></label>
+        <label>Min vurdering<input id="camp-assess" value={c.assessment ?? ''} placeholder="F.eks. befart 2025 – god teltplass" onChange={(e) => upd({ assessment: e.target.value })} /></label>
         <label>Notater<textarea id="camp-notes" rows={3} value={c.notes ?? c.note ?? ''} onChange={(e) => upd({ notes: e.target.value })} /></label>
         <div className="attach">
           {(c.attachments ?? []).map((a) => (
@@ -84,7 +110,12 @@ export default function CampPanel({ id }: { id: string }) {
           ) : (
             <>
               <span className="small">Sikker?</span>
-              <button className="btn small danger" onClick={() => { s.set({ camps: s.camps.filter((x) => x.id !== id), selectedCamp: null }); s.log('annet', `Slettet teltplass ${c.name}`); }}>Ja, slett</button>
+              <button className="btn small danger" onClick={() => {
+                // fjern koblingen i dagplanen (stoppet beholdes som ditt manuelle stopp)
+                exp.plan.days.forEach((d, i) => d.campId === id && updateDay(i, { campId: undefined }));
+                s.set({ camps: s.camps.filter((x) => x.id !== id), selectedCamp: null });
+                s.log('annet', `Slettet teltplass ${c.name}`);
+              }}>Ja, slett</button>
               <button className="btn small ghost" onClick={() => setConfirmDel(false)}>Avbryt</button>
             </>
           )}
