@@ -5,7 +5,7 @@ import { onSourceStatus, sourceStatus } from '../lib/api/http';
 import { wmsLayers, type WmsLayer } from '../lib/api/nve';
 import { Badge, Card, fmtTime } from '../components/ui';
 import { runDiagnostics, type DiagResult } from '../lib/diagnostics';
-import { storageHealth } from '../state/store';
+import { useSave } from '../storage/persistence';
 import { elevCacheWarning } from '../lib/api/kartverket';
 
 function Diagnostics() {
@@ -35,7 +35,7 @@ function Diagnostics() {
   return (
     <Card title="Live-diagnose av alle integrasjoner" className="wide" right={<button className="btn" onClick={run} disabled={busy}>{busy ? 'Tester…' : 'Kjør alle tester nå'}</button>}>
       <p className="small">Kjører <b>ekte</b> kall fra denne nettleseren mot Kartverket, NVE, MET og Varsom og kontrollerer svarformatet (feltnavn, koordinatrekkefølge, plausible verdier). Ingen testdata. Resultatet gjelder der du åpner appen – utviklingsmiljøet hadde ikke nettilgang til disse tjenestene.</p>
-      {!storageHealth.ok && <p className="err small">{storageHealth.message}</p>}
+      {useSave.getState().error && <p className="err small">{useSave.getState().error}</p>}
       {elevCacheWarning && <p className="warn small">{elevCacheWarning}</p>}
       {res.length === 0 && <p className="small muted">Ikke kjørt ennå.</p>}
       <div className="diag">

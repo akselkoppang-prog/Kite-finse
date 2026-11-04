@@ -1,4 +1,5 @@
 import { useStore, routeHash } from '../state/store';
+import { majorChange } from '../storage/hooks';
 import { PLACE_QUERIES, ROUTE_CHAINS } from '../data/places';
 import { resolvePlace } from './api/kartverket';
 import { loadHydropower, lakesAlong } from './api/nve';
@@ -36,6 +37,7 @@ export async function loadInitialGpx() {
 
 /** Importerer spor/ruter som NYE ruter og <wpt> som egne markører. Eksisterende data røres ikke. */
 export async function importGpxFile(file: File) {
+  majorChange.fn(`Før GPX-import (${file.name})`);
   const xml = await file.text();
   const parsed = parseGpx(xml, `Importert GPX «${file.name}» ${now().slice(0, 10)}`);
   const st = useStore.getState();
@@ -155,28 +157,4 @@ export async function runTerrainForActive(stepM: number, onProgress: (f: number)
   return res;
 }
 
-const CACHE_KEYS = ['hydro', 'lakes', 'terrain'] as const;
-
-/** Hele prosjektet: ruter, notater, markører, overstyringer, kites, datoer, dagsplan, utstyr, historikk.
- *  includeData=true tar også med NVE-/DTM-data for offline bruk. */
-export function exportPlanJson(includeData = true): string {
-  const s = useStore.getState();
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(s)) {
-    if (typeof v === 'function') continue;
-    if (['focus', 'editMode', 'draftZone', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'windPoints', 'tab', 'simPlay', 'dailyView', 'selectedCamp'].includes(k)) continue;
-    if (!includeData && (CACHE_KEYS as readonly string[]).includes(k)) continue;
-    out[k] = v;
-  }
-  return JSON.stringify({ format: 'kite-finse-rjukan-plan', version: 2, exportedAt: now(), ...out }, null, 2);
-}
-
-export function importPlanJson(txt: string) {
-  const j = JSON.parse(txt);
-  if (j.format !== 'kite-finse-rjukan-plan') throw new Error('Ukjent filformat');
-  const { format: _f, version: _v, exportedAt: _e, ...rest } = j;
-  void _f; void _v; void _e;
-  if (!Array.isArray(rest.routes)) throw new Error('Filen mangler ruter');
-  useStore.getState().set({ ...rest, activeRouteId: rest.activeRouteId ?? rest.routes?.[0]?.id ?? null });
-  useStore.getState().log('annet', `Åpnet prosjektfil (${rest.routes.length} ruter)`);
-}
+// Prosjekteksport/-import: se src/storage/archive.ts (versjonert JSON + ZIP).

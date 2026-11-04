@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
 import { useStore, routeHash } from '../state/store';
 import { useActiveRoute, useBarrierCheck, useProfile, useTerrain } from '../state/derived';
-import { buildChainRoutes, checkLakesForActive, exportPlanJson, importGpxFile, importPlanJson, loadHydro, resolveAllPlaces, runTerrainForActive } from '../lib/actions';
+import { buildChainRoutes, checkLakesForActive, importGpxFile, loadHydro, resolveAllPlaces, runTerrainForActive } from '../lib/actions';
+import { exportZip, importProject } from '../storage/archive';
+import { useSave, flush, switchProject } from '../storage/persistence';
 import { download, toGpx } from '../lib/gpx';
 import { detourAround } from '../lib/analysis/barriers';
 import { Badge, Card, Progress, fmtTime } from './ui';
@@ -58,21 +60,23 @@ export default function RoutePanel() {
           <button className="btn danger" disabled={!route} onClick={() => route && confirm(`Slette «${route.name}»?`) && s.removeRoute(route.id)}>Slett</button>
         </div>
         <div className="btns">
-          <button className="btn ghost" onClick={() => download('kiteplan.json', exportPlanJson(), 'application/json')}>Lagre plan (JSON)</button>
-          <button className="btn ghost" onClick={() => jsonIn.current?.click()}>Åpne plan</button>
+          <button className="btn ghost" onClick={() => run('Eksport', async () => { await flush(); const z = await exportZip(useSave.getState().projectId, useSave.getState().projectName); download(`kiteplan_${new Date().toISOString().slice(0, 10)}.zip`, z, 'application/zip'); return `Prosjekt lastet ned som ZIP (${(z.size / 1024).toFixed(0)} kB)`; })}>Last ned prosjekt (ZIP)</button>
+          <button className="btn ghost" onClick={() => jsonIn.current?.click()}>Åpne prosjektfil som nytt prosjekt</button>
         </div>
-        <p className="muted small">Planen lagres automatisk i nettleseren (localStorage). Bruk «Lagre plan» for sikkerhetskopi / deling.</p>
+        <p className="muted small">Alt lagres automatisk i nettleseren (IndexedDB). Last ned ZIP jevnlig – data deles ikke mellom enheter. Mer under Innstillinger / Lagring.</p>
         <input ref={gpxIn} type="file" accept=".gpx,application/gpx+xml" hidden onChange={(e) => e.target.files?.[0] && run('GPX-import', async () => importGpxFile(e.target.files![0]))} />
         <input
           ref={jsonIn}
           type="file"
-          accept=".json"
+          accept=".json,.zip"
           hidden
           onChange={(e) =>
             e.target.files?.[0] &&
             run('Planimport', async () => {
-              importPlanJson(await e.target.files![0].text());
-              return 'Plan lastet';
+              await flush();
+              const r = await importProject(e.target.files![0], 'new', useSave.getState().projectId);
+              await switchProject(r.projectId);
+              return `Åpnet «${r.name}» som nytt prosjekt (${r.routes} ruter, ${r.images} bilder). Det forrige prosjektet ligger under Innstillinger / Lagring.`;
             })
           }
         />

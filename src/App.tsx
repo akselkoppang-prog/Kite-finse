@@ -24,7 +24,8 @@ import SimulatorPage from './pages/SimulatorPage';
 import ModelPage from './pages/ModelPage';
 import CampPanel from './components/CampPanel';
 import { SimPlayer } from './components/sim/SimPlayer';
-import { storageHealth } from './state/store';
+import StoragePage from './pages/StoragePage';
+import { SaveIndicator, SaveBanners } from './components/SaveStatus';
 import { Badge } from './components/ui';
 import { fmtKm } from './lib/geo';
 
@@ -40,6 +41,7 @@ const TABS: [Tab, string][] = [
   ['tidslinje', 'Kalender'],
   ['modell', 'Modell & kalibrering'],
   ['kilder', 'Datakilder & diagnose'],
+  ['lagring', 'Innstillinger / Lagring'],
 ];
 
 function Overview() {
@@ -97,6 +99,7 @@ export default function App() {
             <div className="title">Finse → Rjukan</div>
             <div className="sub">Snowkite-ekspedisjon · mars/april 2027 · planleggingsverktøy</div>
           </div>
+          <SaveIndicator />
         </div>
         <nav className="tabs">
           {TABS.map(([t, l]) => (
@@ -110,7 +113,7 @@ export default function App() {
       <div className="banner">
         Alle ruter er <b>FORSLAG – ikke verifisert i terrenget</b>. «Brukergodkjent» er din egen vurdering, ikke uavhengig verifisering. Verktøyet erstatter ikke skredvarsel, isvurdering eller lokalkunnskap.
       </div>
-      {!storageHealth.ok && <div className="banner err">{storageHealth.message}</div>}
+      <SaveBanners />
       <main className={`main tab-${tab}`}>
         <div className={`mapwrap ${tab === 'kart' ? '' : 'hidden'}`}>
           <div className={`side ${side ? 'open' : ''}`}>
@@ -150,6 +153,7 @@ export default function App() {
         {tab === 'overstyring' && <OverridesPage />}
         {tab === 'utstyr' && <GearPage />}
         {tab === 'tidslinje' && <TimelinePage />}
+        {tab === 'lagring' && <StoragePage />}
         {tab === 'kilder' && <SourcesPage />}
       </main>
       <footer className="foot small muted">

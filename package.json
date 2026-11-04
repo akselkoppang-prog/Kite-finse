@@ -8,11 +8,13 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "esbuild tests/logic.test.ts --bundle --platform=node --outfile=node_modules/.cache/logic.test.cjs --log-level=warning && esbuild tests/sim.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/sim.test.mjs --log-level=warning && TZ=Europe/Oslo node node_modules/.cache/logic.test.cjs && TZ=Europe/Oslo node node_modules/.cache/sim.test.mjs"
+    "test": "esbuild tests/logic.test.ts --bundle --platform=node --outfile=node_modules/.cache/logic.test.cjs --log-level=warning && esbuild tests/sim.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/sim.test.mjs --log-level=warning && TZ=Europe/Oslo node node_modules/.cache/logic.test.cjs && TZ=Europe/Oslo node node_modules/.cache/sim.test.mjs && esbuild tests/storage.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/storage.test.mjs --log-level=warning && node node_modules/.cache/storage.test.mjs"
   },
   "dependencies": {
     "@turf/turf": "^7.4.0",
     "echarts": "^5.6.0",
+    "fflate": "^0.8.3",
+    "idb": "^8.0.4",
     "leaflet": "1.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -25,6 +27,7 @@
     "@types/react-dom": "^18.3.7",
     "@types/suncalc": "^1.9.2",
     "@vitejs/plugin-react": "^4.7.0",
+    "fake-indexeddb": "^6.2.7",
     "typescript": "^5.9.3",
     "vite": "^5.4.21"
   }

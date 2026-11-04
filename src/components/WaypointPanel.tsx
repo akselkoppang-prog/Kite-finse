@@ -5,25 +5,13 @@ import { allCategories, categoryOf, VERIFICATION_TEXT } from '../data/categories
 import { cumulative, fmtCoord, fmtDM, nearestOnRoute, uid } from '../lib/geo';
 import { cachedElevation } from '../lib/api/kartverket';
 import { Badge } from './ui';
+import { AttachmentImg } from './SaveStatus';
+import { putImage } from '../storage/blobs';
+import { releaseImage } from '../storage/backup';
+import { useSave } from '../storage/persistence';
 import type { Annotated, Attachment, Verification } from '../types';
 
 /** Skalerer et bilde ned (maks 800 px) til JPEG-data-URL så det får plass i lokal lagring. */
-async function shrink(file: File): Promise<string> {
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  await new Promise((res, rej) => {
-    img.onload = res;
-    img.onerror = rej;
-    img.src = url;
-  });
-  const k = Math.min(1, 800 / Math.max(img.width, img.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(img.width * k);
-  c.height = Math.round(img.height * k);
-  c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
-  URL.revokeObjectURL(url);
-  return c.toDataURL('image/jpeg', 0.7);
-}
 
 export default function WaypointPanel({ kind, id }: { kind: 'wp' | 'marker'; id: string }) {
   const s = useStore();
@@ -51,7 +39,12 @@ export default function WaypointPanel({ kind, id }: { kind: 'wp' | 'marker'; id:
   const ver = (item.verification ?? 'uverifisert') as Verification;
   const day = plan.days.findIndex((d) => dist >= d.d0 && dist <= d.d1 + 1);
 
-  const addAttachment = (a: Attachment) => patch({ attachments: [...(item.attachments ?? []), a] });
+  const addAttachment = (a: Attachment) => {
+    // les siste versjon (opplasting er asynkron)
+    const st = useStore.getState();
+    const cur = wp && route ? st.routes.find((r) => r.id === route.id)?.waypoints.find((w) => w.id === wp.id) : st.markers.find((m) => m.id === mk?.id);
+    patch({ attachments: [...(cur?.attachments ?? []), a] });
+  };
 
   return (
     <div className="drawer">
@@ -104,8 +97,8 @@ export default function WaypointPanel({ kind, id }: { kind: 'wp' | 'marker'; id:
         <div className="attach">
           {(item.attachments ?? []).map((a) => (
             <div key={a.id} className="att">
-              {a.kind === 'bilde' ? <img src={a.href} alt={a.name} /> : <a href={a.href} target="_blank" rel="noreferrer">🔗 {a.name}</a>}
-              <button className="link danger" onClick={() => patch({ attachments: (item.attachments ?? []).filter((x) => x.id !== a.id) })}>fjern</button>
+              {a.kind === 'bilde' ? <AttachmentImg a={a} /> : <a href={a.href} target="_blank" rel="noreferrer">🔗 {a.name}</a>}
+              <button className="link danger" onClick={() => { patch({ attachments: (item.attachments ?? []).filter((x) => x.id !== a.id) }); if (a.blobId) void releaseImage(a.blobId); }}>fjern</button>
             </div>
           ))}
         </div>
@@ -116,16 +109,19 @@ export default function WaypointPanel({ kind, id }: { kind: 'wp' | 'marker'; id:
             setLinkUrl('');
           }}>Legg til lenke</button>
         </div>
-        <label className="small">Bilde (skaleres ned og lagres i planen)
+        <label className="small">Bilde (skaleres til maks 1600 px og lagres som fil i nettleseren)
           <input id="att-img" type="file" accept="image/*" onChange={async (e) => {
             const f = e.target.files?.[0];
             if (!f) return;
             try {
-              addAttachment({ id: uid('att'), name: f.name, href: await shrink(f), kind: 'bilde', addedAt: new Date().toISOString() });
-              setMsg('Bilde lagret. Bilder tar plass i nettleserlagringen – lagre prosjektfilen jevnlig.');
-            } catch {
-              setMsg('Kunne ikke lese bildet.');
+              setMsg('Lagrer bilde …');
+              const img = await putImage(f, f.name, useSave.getState().projectId);
+              addAttachment({ id: uid('att'), name: f.name, href: '', kind: 'bilde', addedAt: new Date().toISOString(), blobId: img.blobId, thumbId: img.thumbId, size: img.size, width: img.width, height: img.height });
+              setMsg(img.deduped ? 'Bildet fantes allerede – gjenbrukt (ingen ekstra plass).' : `Bilde lagret (${img.width}×${img.height}, ${(img.size / 1024).toFixed(0)} kB inkl. miniatyr).`);
+            } catch (err) {
+              setMsg(`Kunne ikke lagre bildet: ${(err as Error).message}`);
             }
+            e.target.value = '';
           }} />
         </label>
         {msg && <p className="small muted">{msg}</p>}

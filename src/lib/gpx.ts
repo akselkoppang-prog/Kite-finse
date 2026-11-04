@@ -100,8 +100,8 @@ ${trks.join('\n')}
 `;
 }
 
-export function download(filename: string, content: string, mime = 'application/gpx+xml') {
-  const blob = new Blob([content], { type: mime });
+export function download(filename: string, content: string | Blob, mime = 'application/gpx+xml') {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;

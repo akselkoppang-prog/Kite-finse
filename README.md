@@ -38,6 +38,41 @@ Slå på Pages i repoets innstillinger (Settings → Pages → Source: GitHub Ac
 
 Planen lagres automatisk i nettleseren (localStorage).
 
+## Versjon 4 – lagring i IndexedDB (rettet «Nettleserlagringen er full»)
+
+**Rotårsak:** Hele app-tilstanden ble lagret som ÉN JSON-streng i `localStorage` (grense ca. 5 MB) ved HVER endring.
+I tillegg til planen din inneholdt den hurtigbuffer som kan hentes på nytt: NVE-innsjøpolygoner langs ruten
+(lagret én gang per ruteversjon og aldri ryddet), NVE-magasinpolygoner, terrenganalyser, prognoser, kalibreringsspor
+og bilder som base64. Da strengen passerte grensen, feilet hver lagring (meldingen viste 16,5 MB). Endringer etter det
+fantes bare i minnet. Høydecachen lå i tillegg i localStorage og konkurrerte om de samme 5 MB.
+
+**Ny arkitektur (`src/storage/`):**
+| Lager | Innhold |
+|---|---|
+| `projects` | ett objekt per ekspedisjon |
+| `slices` | prosjektdata i 13 små deler (tur, kites, teltplasser, overstyringer, notater, simulering …) – en endring skriver bare sin del |
+| `routes` | én post per rute – å dra et punkt skriver bare den ruten |
+| `caches` | NVE/terreng/prognose/høydecache – kan ryddes, bare nåværende ruteversjoner lagres |
+| `blobs` | bilder som Blob (maks 1600 px JPEG + 240 px miniatyr, SHA-256-duplikatkontroll) |
+| `backups` | øyeblikksbilder (automatisk hvert 10. min ved endringer, før sletting av ruter, GPX-import, import og gjenoppretting) |
+| `meta` | migreringsstatus, aktivt prosjekt, siste lagring/backup, innstillinger |
+
+- **Autolagring:** 400 ms debounce (maks 2 s), én skriving om gangen, «LAGRET» først når IndexedDB har bekreftet. Lagrer straks når fanen skjules (iPad/Safari suspenderer faner).
+- **Feil:** data beholdes i minnet, nødkopi i localStorage, nye forsøk 3 s → 60 s, tydelig banner. Ved neste oppstart tilbys nødkopien.
+- **Migrering:** les → valider → beskyttet kopi av originalen → bilder til Blob → skriv → les tilbake og verifiser → «verified». Den gamle localStorage-kopien slettes ikke automatisk.
+- **Eksport:** ZIP (`project.json`, `metadata.json`, `routes/*.gpx`, `images/`, `images/thumbs/`, `attachments/`) eller JSON v3 (med/uten bilder). Import godtar alle tidligere formater.
+- **Innstillinger / Lagring:** forbruk og kvote, varig lagring, størrelse per kategori, prosjekter, kopier (gjenopprett/last ned/slett), bilder (største først, slett), ubrukte filer, hurtigbuffer, migreringsrapport.
+- Ytelse: tidssone-formatering ble opprettet tusenvis av ganger per ruteendring (2–3 s forsinkelse per klikk) – nå ~170 ms.
+
+**Tester:** `npm test` (logikk, simulering, lagring med IndexedDB i minnet). Nettleser-E2E (Chromium) dekker ny ekspedisjon,
+GPX-import, 100 rutepunkter, teltplassnotater, flere overstyringer, store bilder (4000×3000 → ~155 kB), kite/dato/simulering,
+lukk/åpne nettleser, omlasting, gjenoppretting, ZIP-eksport/import i ren profil, kvotefeil, avbrutt lagring, nødkopi og
+avbrutt migrering (52 sjekker).
+
+**Begrensninger:** Safari/WebKit kunne ikke testes i utviklingsmiljøet (kun Chromium). Safari kan slette nettstedsdata etter
+7 dager uten bruk (unntatt Hjem-skjerm-apper) og gir ofte ikke «varig lagring» – last ned ZIP jevnlig. Data synkroniseres
+ikke mellom enheter.
+
 ## Versjon 3 – ytelsessimulator
 
 ### Nytt

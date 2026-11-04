@@ -4,7 +4,8 @@ import { useActiveRoute, useDayPlan, useProfile } from '../state/derived';
 import { KITES } from '../data/kites';
 import { uid, fmtCoord, fmtKm, haversine } from '../lib/geo';
 import { download, toGpx, waypointCsv } from '../lib/gpx';
-import { exportPlanJson } from '../lib/actions';
+import { exportZip } from '../storage/archive';
+import { useSave, flush } from '../storage/persistence';
 import { cachedTileCount, clearTiles, corridorTiles, prefetchTiles } from '../lib/offline';
 import { SOURCES } from '../data/sources';
 import { fmtClock } from '../lib/sun';
@@ -120,7 +121,7 @@ export default function GearPage() {
 
       <Card title="Offline og eksport" className="wide">
         <div className="btns">
-          <button className="btn" onClick={() => download(`finse-rjukan-prosjekt-${s.tripDate}.json`, exportPlanJson(true), 'application/json')}>Last ned hele prosjektet (JSON inkl. NVE/DTM-data)</button>
+          <button className="btn" onClick={async () => { await flush(); download(`finse-rjukan-prosjekt-${s.tripDate}.zip`, await exportZip(useSave.getState().projectId, useSave.getState().projectName, true), 'application/zip'); }}>Last ned hele prosjektet (ZIP inkl. bilder og NVE/DTM-buffer)</button>
           <button className="btn" disabled={!route} onClick={() => route && download('finse-rjukan.gpx', toGpx([route, ...s.routes.filter((r) => r.id !== route.id && r.visible)], s.camps, s.markers))}>GPX (ruter, punkter, notater)</button>
           <button className="btn" onClick={() => download('waypoints.csv', waypointCsv(route ? [route] : [], s.markers), 'text/csv')}>Waypoint-liste (CSV)</button>
           <button className="btn" onClick={printOverview}>Utskrivbar oversikt</button>

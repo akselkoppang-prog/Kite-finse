@@ -5,20 +5,12 @@ import { evaluateCamp } from '../lib/analysis/camps';
 import { dirName, fmtCoord, fmtDM, nearestOnRoute, uid } from '../lib/geo';
 import { cachedElevation } from '../lib/api/kartverket';
 import { Badge } from './ui';
+import { AttachmentImg } from './SaveStatus';
+import { putImage } from '../storage/blobs';
+import { releaseImage } from '../storage/backup';
+import { useSave } from '../storage/persistence';
 import type { Camp } from '../types';
 
-async function shrink(file: File): Promise<string> {
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-  const k = Math.min(1, 800 / Math.max(img.width, img.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(img.width * k);
-  c.height = Math.round(img.height * k);
-  c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
-  URL.revokeObjectURL(url);
-  return c.toDataURL('image/jpeg', 0.7);
-}
 
 /** Redigering av teltplass: navn, natt, rolle (foretrukket/reserve), notater, bilder, godkjenning, kopi, slett. */
 export default function CampPanel({ id }: { id: string }) {
@@ -65,12 +57,20 @@ export default function CampPanel({ id }: { id: string }) {
         <label>Notater<textarea id="camp-notes" rows={3} value={c.notes ?? c.note ?? ''} onChange={(e) => upd({ notes: e.target.value })} /></label>
         <div className="attach">
           {(c.attachments ?? []).map((a) => (
-            <div key={a.id} className="att"><img src={a.href} alt={a.name} /><button className="link danger" onClick={() => upd({ attachments: (c.attachments ?? []).filter((x) => x.id !== a.id) })}>fjern</button></div>
+            <div key={a.id} className="att"><AttachmentImg a={a} /><button className="link danger" onClick={() => { upd({ attachments: (c.attachments ?? []).filter((x) => x.id !== a.id) }); if (a.blobId) void releaseImage(a.blobId); }}>fjern</button></div>
           ))}
         </div>
         <label className="small">Legg til bilde<input id="camp-img" type="file" accept="image/*" onChange={async (e) => {
           const f = e.target.files?.[0];
-          if (f) upd({ attachments: [...(c.attachments ?? []), { id: uid('att'), name: f.name, href: await shrink(f), kind: 'bilde', addedAt: new Date().toISOString() }] });
+          e.target.value = '';
+          if (!f) return;
+          try {
+            const img = await putImage(f, f.name, useSave.getState().projectId);
+            const cur = useStore.getState().camps.find((x) => x.id === id);
+            upd({ attachments: [...(cur?.attachments ?? []), { id: uid('att'), name: f.name, href: '', kind: 'bilde', addedAt: new Date().toISOString(), blobId: img.blobId, thumbId: img.thumbId, size: img.size, width: img.width, height: img.height }] });
+          } catch (err) {
+            alert(`Kunne ikke lagre bildet: ${(err as Error).message}`);
+          }
         }} /></label>
         <p className="small muted">Flytt teltplassen ved å dra ikonet i kartet.</p>
         <div className="btns">

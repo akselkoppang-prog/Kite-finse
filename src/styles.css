@@ -310,3 +310,27 @@ details.form1 > summary { cursor: pointer; margin-bottom: 6px; }
 .dl-sun { position: absolute; top: 1px; font-size: 9.5px; color: #fff; transform: translateX(2px); white-space: nowrap; text-shadow: 0 0 2px #000; }
 .dl-sun.right { transform: translateX(-100%); }
 .specs td { min-width: 120px; }
+
+/* ---------- v4: lagring ---------- */
+.boot { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center; }
+.boot .logo { font-size: 48px; }
+.saveind { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #0e1729; color: var(--text); border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; letter-spacing: .3px; cursor: pointer; white-space: nowrap; }
+.saveind .dotst { width: 8px; height: 8px; border-radius: 50%; background: var(--grey); }
+.sv-saved .dotst { background: var(--green); }
+.sv-saving .dotst { background: var(--accent); animation: pulse 1s infinite; }
+.sv-unsaved .dotst { background: var(--yellow); }
+.sv-warning { border-color: var(--yellow); }
+.sv-warning .dotst { background: var(--yellow); }
+.sv-failed { border-color: var(--red); color: #fecaca; }
+.sv-failed .dotst { background: var(--red); }
+@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .sv-saving .dotst { animation: none; } }
+.banner.err { background: #3b0d0d; color: #fecaca; border-bottom-color: #7f1d1d; }
+.banner.warnb { background: #2a1d07; color: #fde68a; }
+.banner .btn { margin-left: 8px; }
+.quota { height: 8px; background: #0e1729; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.quota > div { height: 100%; background: linear-gradient(90deg, var(--green), var(--yellow) 70%, var(--red)); }
+.stthumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; display: inline-block; background: #0e1729; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal-box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; max-width: 460px; width: 100%; }
+.att a img { max-width: 140px; border-radius: 6px; display: block; }

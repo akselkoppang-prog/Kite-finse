@@ -85,35 +85,27 @@ export interface ElevPoint extends LatLon {
   datakilde?: string;
 }
 
-const CACHE_KEY = 'kite.elevCache.v1';
-const elevCache: Record<string, ElevPoint> = (() => {
-  try {
-    return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-  } catch {
-    return {};
-  }
-})();
-let saveTimer: number | undefined;
+// Høydecachen lagres i IndexedDB (caches-lageret) av lagringsmodulen – ikke lenger i localStorage.
+const elevCache: Record<string, ElevPoint> = {};
+let elevChanged = false;
+export function loadElevCache(v: Record<string, ElevPoint>) {
+  Object.assign(elevCache, v);
+}
+export const elevSnapshot = () => elevCache;
+export const elevDirty = () => elevChanged;
+export const markElevSaved = () => {
+  elevChanged = false;
+};
+export function clearElevCache() {
+  Object.keys(elevCache).forEach((k) => delete elevCache[k]);
+  elevChanged = true;
+}
 const MAX_CACHE = 30000;
-export let elevCacheWarning = '';
+export const elevCacheWarning = '';
 function persistCache() {
-  clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => {
-    const keys = Object.keys(elevCache);
-    if (keys.length > MAX_CACHE) keys.slice(0, keys.length - MAX_CACHE).forEach((k) => delete elevCache[k]); // eldste ut
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(elevCache));
-      elevCacheWarning = '';
-    } catch {
-      // Lagring full: halver cachen og prøv igjen, ellers behold kun i minnet
-      Object.keys(elevCache).slice(0, Math.floor(Object.keys(elevCache).length / 2)).forEach((k) => delete elevCache[k]);
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(elevCache));
-      } catch {
-        elevCacheWarning = 'Nettleserlagringen er full – høydedata caches bare i minnet.';
-      }
-    }
-  }, 500);
+  const keys = Object.keys(elevCache);
+  if (keys.length > MAX_CACHE) keys.slice(0, keys.length - MAX_CACHE).forEach((k) => delete elevCache[k]); // eldste ut
+  elevChanged = true;
 }
 const ckey = (p: LatLon) => `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
 

@@ -61,13 +61,15 @@ export function sunDay(dateStr: string, at: LatLon, heightM = 0): SunDay {
   return r;
 }
 
+const CLOCK_FMT = new Intl.DateTimeFormat('nb-NO', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 export function fmtClock(d: Date | null | undefined): string {
-  if (!d) return '–';
-  return d.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+  if (!d || !Number.isFinite(d.getTime())) return '–';
+  return CLOCK_FMT.format(d);
 }
 
+const TZ_FMT = new Intl.DateTimeFormat('nb-NO', { timeZone: TZ, timeZoneName: 'short' });
 export function tzLabel(d: Date): string {
-  const parts = new Intl.DateTimeFormat('nb-NO', { timeZone: TZ, timeZoneName: 'short' }).formatToParts(d);
+  const parts = TZ_FMT.formatToParts(d);
   return parts.find((p) => p.type === 'timeZoneName')?.value ?? TZ;
 }
 
@@ -76,19 +78,30 @@ export function atLocalHour(dateStr: string, h: number): Date {
   return new Date(zonedMidnight(dateStr).getTime() + h * 3600000);
 }
 
+// Intl.DateTimeFormat er dyrt å lage (~1 ms) – gjenbruk én instans (tidligere laget ved hvert kall → sekunder per ruteendring)
+const HM_FMT = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
+const midnightCache = new Map<string, Date>();
+
 function zonedMidnight(dateStr: string): Date {
+  const hit = midnightCache.get(dateStr);
+  if (hit) return hit;
+  const r = zonedMidnightRaw(dateStr);
+  if (midnightCache.size > 2000) midnightCache.clear();
+  midnightCache.set(dateStr, r);
+  return r;
+}
+
+function zonedMidnightRaw(dateStr: string): Date {
   // Finn UTC-tidspunktet som tilsvarer 00:00 i Oslo den datoen
   const guess = new Date(`${dateStr}T00:00:00Z`);
-  const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
-  const [hh, mm] = fmt.format(guess).split(':').map(Number);
+  const [hh, mm] = HM_FMT.format(guess).split(':').map(Number);
   const offsetMin = hh * 60 + mm; // Oslo er foran UTC → 01:00 eller 02:00
   return new Date(guess.getTime() - (offsetMin > 720 ? offsetMin - 1440 : offsetMin) * 60000);
 }
 
 export function hourOf(d: Date | null): number | null {
   if (!d) return null;
-  const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
-  const [hh, mm] = fmt.format(d).split(':').map(Number);
+  const [hh, mm] = HM_FMT.format(d).split(':').map(Number);
   return hh + mm / 60;
 }
 

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Camp, HistoryEntry, LakeOverride, Marker, Place, Quiver, Route, Waypoint, Zone } from '../types';
 import type { Category } from '../data/categories';
 import { DEFAULT_PARAMS, DEFAULT_SCENARIOS, type Scenario, type TravelParams } from '../lib/analysis/feasibility';
@@ -9,6 +8,7 @@ import type { ManualWind, RouteForecastPoint } from '../lib/sim/wind';
 import type { SimResult } from '../lib/sim/route';
 import type { CalibTrack } from '../lib/sim/calibration';
 import type { SpecValue, KiteModel } from '../data/kiteSpecs';
+import { majorChange } from '../storage/hooks';
 import { DEFAULT_PACKING, type PackItem } from '../data/packing';
 import type { Dir8 } from '../lib/geo';
 import type { NveHydro, PolyFeature } from '../lib/api/nve';
@@ -16,7 +16,7 @@ import type { TerrainAnalysis } from '../lib/analysis/terrain';
 import type { Snow, Terrain, Goal } from '../lib/analysis/kite';
 import { uid } from '../lib/geo';
 
-export type Tab = 'kart' | 'simulator' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder' | 'modell';
+export type Tab = 'kart' | 'simulator' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder' | 'modell' | 'lagring';
 
 export interface SimUI {
   startDay: number;
@@ -144,42 +144,12 @@ export interface State {
 
 const now = () => new Date().toISOString();
 
-/** localStorage som aldri kaster: ved full lagring vises en advarsel i stedet for at appen krasjer. */
-export const storageHealth = { ok: true, message: '', bytes: 0 };
-const safeStorage = {
-  getItem: (k: string) => {
-    try {
-      return localStorage.getItem(k);
-    } catch {
-      return null;
-    }
-  },
-  setItem: (k: string, v: string) => {
-    try {
-      localStorage.setItem(k, v);
-      storageHealth.ok = true;
-      storageHealth.message = '';
-      storageHealth.bytes = v.length * 2;
-    } catch {
-      storageHealth.ok = false;
-      storageHealth.bytes = v.length * 2;
-      storageHealth.message = `Nettleserlagringen er full (${(v.length / 512).toFixed(0)} kB plan). Siste endringer er IKKE lagret – last ned prosjektfilen og fjern store bilder.`;
-    }
-  },
-  removeItem: (k: string) => {
-    try {
-      localStorage.removeItem(k);
-    } catch {
-      /* */
-    }
-  },
-};
+
 function pushHist(h: HistoryEntry[], kind: HistoryEntry['kind'], text: string): HistoryEntry[] {
   return [{ at: now(), kind, text }, ...h].slice(0, 300);
 }
 
 export const useStore = create<State>()(
-  persist(
     (set, get) => ({
       tab: 'kart',
       routes: [],
@@ -273,7 +243,10 @@ export const useStore = create<State>()(
           const exists = s.routes.some((x) => x.id === r.id);
           return { routes: exists ? s.routes.map((x) => (x.id === r.id ? r : x)) : [...s.routes, r], activeRouteId: s.activeRouteId ?? r.id };
         }),
-      removeRoute: (id) => set((s) => ({ routes: s.routes.filter((r) => r.id !== id), activeRouteId: s.activeRouteId === id ? (s.routes.find((r) => r.id !== id)?.id ?? null) : s.activeRouteId })),
+      removeRoute: (id) => {
+        majorChange.fn(`Før sletting av rute «${get().routes.find((r) => r.id === id)?.name ?? id}»`);
+        set((s) => ({ routes: s.routes.filter((r) => r.id !== id), activeRouteId: s.activeRouteId === id ? (s.routes.find((r) => r.id !== id)?.id ?? null) : s.activeRouteId }));
+      },
       updateWaypoints: (routeId, wps) => set((s) => ({ routes: s.routes.map((r) => (r.id === routeId ? { ...r, waypoints: wps, updatedAt: now() } : r)) })),
       moveWaypoint: (routeId, wpId, lat, lon) =>
         set((s) => ({
@@ -344,16 +317,6 @@ export const useStore = create<State>()(
       setLayer: (k, v) => set((s) => ({ layers: { ...s.layers, [k]: v } })),
       focusOn: (lat, lon, zoom) => set({ focus: { lat, lon, zoom, t: Date.now() }, tab: 'kart' }),
     }),
-    {
-      name: 'kite.plan.v1',
-      storage: createJSONStorage(() => safeStorage),
-      partialize: (s) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { focus, editMode, draftZone, selectedWp, selectedMarker, selectedBarrier, forecastHour, windPoints, simPlay, dailyView, selectedCamp, set: _s, ...rest } = s;
-        return Object.fromEntries(Object.entries(rest).filter(([, v]) => typeof v !== 'function')) as Partial<State>;
-      },
-    },
-  ),
 );
 
 export function routeHash(r: Route | undefined): string {

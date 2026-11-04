@@ -26,10 +26,15 @@ export type Verification = 'uverifisert' | 'advarsel' | 'brukergodkjent' | 'veri
 export interface Attachment {
   id: string;
   name: string;
-  /** Lenke (https://…) eller nedskalert bilde som data-URL */
+  /** Lenke (https://…). For bilder: tom – bildet ligger som Blob i IndexedDB (blobId/thumbId). Gamle planer kan ha data-URL. */
   href: string;
   kind: 'lenke' | 'bilde';
   addedAt: string;
+  blobId?: string;
+  thumbId?: string;
+  size?: number;
+  width?: number;
+  height?: number;
 }
 
 /** Felles notat-felter for rutepunkter og egne markører. */
