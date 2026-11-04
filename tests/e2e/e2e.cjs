@@ -39,6 +39,7 @@ const state = async (p) => {
         const order = (out.slices.find((x) => x.projectId === pid && x.slice === 'routeOrder') || {}).value || [];
         const rs = out.routes.filter((x) => x.projectId === pid).map((x) => x.value);
         st.routes = order.map((id) => rs.find((x) => x.id === id)).filter(Boolean);
+        st.camps = st.camps || []; st.markers = st.markers || [];
         db.close(); res(st);
       } }; });
     };
@@ -109,7 +110,13 @@ const state = async (p) => {
   await p.fill('#wp-name', 'Nødutgang test');
   await p.click('.drawer button[aria-label="Lukk"]');
   await p.click('button:has-text("Panorer")');
+  // umiddelbar omlasting (før autolagringen rekker å skrive): data skal enten være lagret eller tilbys fra nødkopien
   await p.reload(); await p.waitForTimeout(2500); await openAdv(p);
+  let stQ = await state(p);
+  if (!stQ.markers.some((m) => m.name === 'Nødutgang test')) {
+    ok(await p.locator('.banner', { hasText: 'ulagrede endringer' }).count() === 1, 'omlasting midt i lagring: nødkopi tilbys');
+    await p.click('.banner button:has-text("Gjenopprett endringene")'); await p.waitForTimeout(1200);
+  } else ok(true, 'omlasting: endringene var allerede lagret');
   const st1 = await state(p);
   const r0 = st1.routes.find((x) => x.id === 'gpx-original').waypoints[0];
   ok(r0.category === 'launch' && /startplass/.test(r0.description) && r0.verification === 'brukergodkjent', 'rutepunkt-notat lagret etter reload');
@@ -163,7 +170,7 @@ const state = async (p) => {
   await go(p, 'Utstyr & offline'); await p.waitForTimeout(300);
   const [dj] = await Promise.all([p.waitForEvent('download'), p.click('button:has-text("Last ned hele prosjektet")')]);
   const jp = dir + '/proj.zip'; await dj.saveAs(jp);
-  const pj = JSON.parse(require('child_process').execSync(`python3 -c "import zipfile;print(zipfile.ZipFile('${jp}').read('project.json').decode())"`).toString());
+  const pj = JSON.parse(require('child_process').execSync(`python3 -c "import zipfile;z=zipfile.ZipFile('${jp}');print(z.read([n for n in z.namelist() if n.endswith('project.json')][0]).decode())"`).toString());
   const sl = pj.slices;
   ok(pj.version === 3 && sl.lakeOverrides.length >= 1 && sl.quivers && sl.markers.length >= 1 && sl.tripDate === '2027-03-30' && sl.history.length > 0 && sl.travel, 'prosjektfil (ZIP v3) inneholder overstyringer, kites, datoer, markører, historikk, modell');
   ok(/Matvekt/.test(await p.locator('.page .card', { hasText: 'Mat og brensel' }).innerText()), 'mat/brensel-kalkulator vises');

@@ -118,7 +118,10 @@ async function bigJpeg(p, seed) {
   // ---- 1-2: ny ekspedisjon + GPX ----
   await go(p, 'Innstillinger / Lagring'); await p.waitForTimeout(800);
   ok(/VERIFISERT/.test(await p.locator('.page .card', { hasText: 'Flytting fra gammel lagring' }).innerText()), 'lagringssiden viser verifisert migrering og rotårsak');
-  await p.click('button:has-text("+ Ny ekspedisjon")'); await p.waitForTimeout(1500);
+  // v6: nye prosjekter lages under Oversikt → Prosjekt
+  await p.locator('nav.mainnav button', { hasText: 'Oversikt' }).click(); await p.locator('nav.subnav button', { hasText: 'Prosjekt' }).click(); await p.waitForTimeout(600);
+  await p.click('button:has-text("+ Nytt prosjekt")'); await p.fill('#new-proj-name', 'Ny ekspedisjon test');
+  await p.locator('.newproj button', { hasText: 'Finse–Rjukan-ruten' }).click(); await p.click('#new-proj-ok'); await p.waitForTimeout(2500);
   d = proj(await dump(p));
   ok(d.projects.length === 2 && d.pid !== 'default' && d.routes.length === 1 && d.routes[0].kind === 'gpx', 'ny ekspedisjon opprettet med GPX importert');
   await go(p, 'Kart & rute'); await p.waitForTimeout(600);

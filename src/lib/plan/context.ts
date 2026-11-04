@@ -19,16 +19,29 @@ export function routeProfile(route: Route, step = 250): ProfilePt[] {
   const wps = route.waypoints;
   if (wps.length < 2) return [];
   const cum = cumulative(wps);
-  return densify(wps, step).map((s) => {
-    const c = cachedElevation(s);
-    if (c?.z != null) return { ...s, z: c.z, src: 'DTM' as const };
+  const samples = densify(wps, step);
+  const gpx = (s: Sample): number | null => {
     const a = wps[s.seg], b = wps[s.seg + 1];
-    if (a?.eleGpx != null && b?.eleGpx != null) {
-      const L = cum[s.seg + 1] - cum[s.seg];
-      const t = L ? (s.d - cum[s.seg]) / L : 0;
-      return { ...s, z: a.eleGpx + (b.eleGpx - a.eleGpx) * t, src: 'GPX' as const };
+    if (a?.eleGpx == null || b?.eleGpx == null) return a?.eleGpx ?? null;
+    const L = cum[s.seg + 1] - cum[s.seg];
+    const t = L ? (s.d - cum[s.seg]) / L : 0;
+    return a.eleGpx + (b.eleGpx - a.eleGpx) * t;
+  };
+  const dtm = samples.map((s) => cachedElevation(s)?.z ?? null);
+  // Bland ikke kilder punkt for punkt (gir falske topper): DTM bare når nesten hele ruten har DTM.
+  const coverage = dtm.filter((z) => z != null).length / Math.max(1, samples.length);
+  const useDtm = coverage >= 0.9;
+  return samples.map((s, i) => {
+    if (useDtm && dtm[i] != null) return { ...s, z: dtm[i], src: 'DTM' as const };
+    if (useDtm) {
+      // hull i DTM: interpoler mellom nærmeste DTM-punkter
+      let a = i - 1, b = i + 1;
+      while (a >= 0 && dtm[a] == null) a--;
+      while (b < dtm.length && dtm[b] == null) b++;
+      if (a >= 0 && b < dtm.length) return { ...s, z: dtm[a]! + ((dtm[b]! - dtm[a]!) * (i - a)) / (b - a), src: 'DTM' as const };
     }
-    return { ...s, z: null, src: 'ingen' as const };
+    const g = gpx(s);
+    return g != null ? { ...s, z: g, src: 'GPX' as const } : { ...s, z: null, src: 'ingen' as const };
   });
 }
 

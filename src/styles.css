@@ -599,6 +599,7 @@ input[type=range] { accent-color: var(--accent); min-height: 28px; padding: 0; b
 .preset.on { border-color: var(--accent); background: #0c2a44; }
 .incgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px 12px; margin: 8px 0; }
 .exportpage .card .btn { min-height: 38px; }
+.exportpage .card .btn.big { min-height: 48px; }
 .exportpage select { min-height: 38px; }
 
 /* berøringsskjerm (iPad/iPhone): større trykkflater og kartkontroller */

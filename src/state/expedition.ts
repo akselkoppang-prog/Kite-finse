@@ -1,5 +1,6 @@
 import { createContext, createElement, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useStore } from './store';
+import { useShallow } from 'zustand/react/shallow';
 import { useProfile } from './derived';
 import { runExpedition, newDay, type DayPlan, type PlanScenario } from '../lib/sim/expedition';
 import { buildPlanContext, routeOf, runPlan, type PlanRun } from '../lib/plan/context';
@@ -13,7 +14,7 @@ export function useActivePlan(): PlanScenario {
 
 /** Felt i tilstanden som påvirker beregningen (alt annet ignoreres → færre omberegninger). */
 function useCalcInputs() {
-  return useStore((s) => [s.routes, s.activeRouteId, s.terrain, s.quivers, s.activeQuiverId, s.simParams, s.riderKg, s.pulkKg, s.snow, s.tripDate, s.routeForecast, s.travel, s.kiteModelEdits, s.calibTracks, s.kiteOverrides] as const, (a, b) => a.every((x, i) => x === b[i]));
+  return useStore(useShallow((s) => [s.routes, s.activeRouteId, s.terrain, s.quivers, s.activeQuiverId, s.simParams, s.riderKg, s.pulkKg, s.snow, s.tripDate, s.routeForecast, s.travel, s.kiteModelEdits, s.calibTracks, s.kiteOverrides] as const));
 }
 
 function useExpeditionCompute() {

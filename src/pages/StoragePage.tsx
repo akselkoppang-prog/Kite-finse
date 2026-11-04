@@ -9,7 +9,6 @@ import { LEGACY_KEY, legacyPresent, type MigrationReport } from '../storage/migr
 import { clearElevCache } from '../lib/api/kartverket';
 import { clearTiles, cachedTileCount } from '../lib/offline';
 import { download } from '../lib/gpx';
-import { uid } from '../lib/geo';
 import { Badge, Card, fmtTime } from '../components/ui';
 import type { Attachment } from '../types';
 
@@ -226,44 +225,8 @@ export default function StoragePage() {
       </Card>
 
       <Card title="Prosjekter">
-        <ul className="small list">
-          {u?.projects.map((p) => (
-            <li key={p.id}>
-              <b>{p.name}</b> {p.id === pid && <Badge s="GRØNN">aktivt</Badge>} · {kb(p.size)} · endret {fmtTime(p.updatedAt)}
-              {p.id !== pid && (
-                <>
-                  {' '}<button className="link" onClick={() => doRun('Bytt prosjekt', async () => { await switchProject(p.id); return `Åpnet «${p.name}».`; })}>åpne</button>
-                  {' '}<button className="link danger" onClick={() => ask(`Slette prosjektet «${p.name}» med ruter, notater og bilder? Sikkerhetskopiene beholdes.`, () => doRun('Slett prosjekt', async () => {
-                    const db = await getDB();
-                    const tx = db.transaction(['projects', 'slices', 'routes', 'caches', 'blobs'], 'readwrite');
-                    tx.objectStore('projects').delete(p.id);
-                    for (const st of ['slices', 'routes', 'caches', 'blobs'] as const) {
-                      let c = await tx.objectStore(st).index('byProject').openCursor(p.id);
-                      while (c) { await c.delete(); c = await c.continue(); }
-                    }
-                    await tx.done;
-                    return 'Prosjektet er slettet.';
-                  }))}>slett</button>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-        <div className="row small">
-          <input id="proj-name" defaultValue={name} onBlur={(e) => doRun('Gi nytt navn', async () => { const db = await getDB(); const p = await db.get('projects', pid); if (p && e.target.value.trim()) { await db.put('projects', { ...p, name: e.target.value.trim() }); useSave.getState().set({ projectName: e.target.value.trim() }); } })} aria-label="Navn på aktivt prosjekt" />
-          <button className="btn small" onClick={() => doRun('Nytt prosjekt', async () => {
-            await flush();
-            const db = await getDB();
-            const id = uid('prj');
-            const now = new Date().toISOString();
-            await db.put('projects', { id, name: `Ny ekspedisjon ${now.slice(0, 10)}`, createdAt: now, updatedAt: now, schema: 1 });
-            await switchProject(id);
-            const { loadInitialGpx } = await import('../lib/actions');
-            await loadInitialGpx();
-            await flush();
-            return 'Nytt prosjekt opprettet med din GPX som utgangspunkt.';
-          })}>+ Ny ekspedisjon</button>
-        </div>
+        <p className="small">Du har {u?.projects.length ?? 0} prosjekt(er). Opprett, åpne, dupliser, gi nytt navn, arkiver og slett under <button className="link" onClick={() => useStore.getState().setTab('prosjekter')}>Oversikt → Prosjekt</button>.</p>
+        <ul className="small list">{u?.projects.map((p) => <li key={p.id}>{p.name} {p.id === pid && <Badge s="GRØNN">aktivt</Badge>} · {kb(p.size)}</li>)}</ul>
       </Card>
 
       <Card title={`Bilder og vedlegg (${images.length})`} className="wide">

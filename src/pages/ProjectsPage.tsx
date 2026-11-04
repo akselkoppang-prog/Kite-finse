@@ -141,7 +141,7 @@ export default function ProjectsPage() {
       <Card title={`Alle prosjekter (${list.length})`} className="wide" right={archived > 0 ? <label className="chk small"><input type="checkbox" checked={showArch} onChange={(e) => setShowArch(e.target.checked)} /> Vis arkiverte ({archived})</label> : undefined}>
         <p className="small muted">Hvert prosjekt har egne ruter, GPX, scenarioer, vind, kites, teltplasser, punkter, vann-godkjenninger, notater og eksportvalg. Å åpne et annet prosjekt lagrer det du har åpent først.</p>
         <div className="pgrid">
-          {visible.map((p) => <ProjectCard key={p.id} p={p} active={p.id === pid} onOpen={() => void run('Åpne', async () => { await switchProject(p.id); return `Åpnet «${p.name}».`; })} onAction={(a) => act(p, a)} />)}
+          {visible.map((p) => <ProjectCard key={p.id} p={p} active={p.id === pid} onOpen={() => void run('Åpne', async () => { await switchProject(p.id); useStore.getState().set({ tab: 'oversikt' }); return `Åpnet «${p.name}».`; })} onAction={(a) => act(p, a)} />)}
         </div>
         {!nw.open ? (
           <div className="btns">
@@ -150,7 +150,7 @@ export default function ProjectsPage() {
               const f = e.target.files?.[0];
               e.target.value = '';
               if (!f) return;
-              void run('Import', async () => { const r = await importProject(f, 'new', pid); await switchProject(r.projectId); return `Importerte «${r.name}» som nytt prosjekt (${r.routes} ruter, ${r.images} bilder). Andre prosjekter er ikke endret.`; });
+              void run('Import', async () => { const r = await importProject(f, 'new', pid); await switchProject(r.projectId); useStore.getState().set({ tab: 'oversikt' }); return `Importerte «${r.name}» som nytt prosjekt (${r.routes} ruter, ${r.images} bilder). Andre prosjekter er ikke endret.`; });
             }} /></label>
           </div>
         ) : (
@@ -162,7 +162,7 @@ export default function ProjectsPage() {
               <button className={`btn small ${nw.template === 'finse' ? 'on' : ''}`} onClick={() => setNw({ ...nw, template: 'finse' })}>Start med Finse–Rjukan-ruten</button>
             </div>
             <div className="btns">
-              <button id="new-proj-ok" className="btn" disabled={!nw.name.trim() || !!busy} onClick={() => void run('Nytt prosjekt', async () => { await createProject({ name: nw.name, description: nw.desc, template: nw.template }); setNw({ ...nw, open: false }); return `«${nw.name}» er opprettet og åpnet.${nw.template === 'tom' ? ' Importer en GPX under Oversikt → «Rute og data».' : ''}`; })}>Opprett og åpne</button>
+              <button id="new-proj-ok" className="btn" disabled={!nw.name.trim() || !!busy} onClick={() => void run('Nytt prosjekt', async () => { await createProject({ name: nw.name, description: nw.desc, template: nw.template }); setNw({ ...nw, open: false }); useStore.getState().set({ tab: 'oversikt' }); return `«${nw.name}» er opprettet og åpnet.${nw.template === 'tom' ? ' Importer en GPX under Oversikt → «Rute og data».' : ''}`; })}>Opprett og åpne</button>
               <button className="btn ghost" onClick={() => setNw({ ...nw, open: false })}>Avbryt</button>
             </div>
           </div>

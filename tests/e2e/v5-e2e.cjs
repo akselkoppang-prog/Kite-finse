@@ -61,7 +61,7 @@ const setRange = async (p, sel, v) => { await p.locator(sel).fill(String(v)); aw
 
   // 1. Enkel navigasjon
   const nav = await p.locator('nav.mainnav button').allInnerTexts();
-  ok(nav.length === 5 && /Oversikt/.test(nav[0]) && /Dagplan/.test(nav[1]) && /Vær & kite/.test(nav[2]) && /Utstyr/.test(nav[3]) && /Innstillinger/.test(nav[4]), `1. fem hovedseksjoner (${nav.map((x) => x.replace(/\s+/g, ' ')).join(' | ')})`);
+  ok(nav.length === 6 && /Oversikt/.test(nav[0]) && /Dagplan/.test(nav[1]) && /Vær & kite/.test(nav[2]) && /Utstyr/.test(nav[3]) && /Eksport/.test(nav[4]) && /Innstillinger/.test(nav[5]), `1. fem hovedseksjoner (${nav.map((x) => x.replace(/\s+/g, ' ')).join(' | ')})`);
   ok(await p.locator('.ov-hero').count() === 1 && await p.locator('.ov-day').count() >= 2 && await p.locator('.leaflet-container').count() === 1, '1. oversikt = kart + sammendrag + dagliste');
   await p.screenshot({ path: dir + '/v5-oversikt.png' });
 
@@ -113,8 +113,8 @@ const setRange = async (p, sel, v) => { await p.locator(sel).fill(String(v)); aw
   await p.locator('button', { hasText: 'Prøv dag 1 = 35 / 50 / 60 km' }).click(); await p.waitForTimeout(1200);
   const st7 = await state(p);
   ok(st7.plans.length >= 4 && plan(st7).id === 'plan-main' && plan(st7).days[0].target.km === 50, `7. tre varianter laget, hovedplanen urørt (${st7.plans.length} planer)`);
-  ok(await p.locator('.cmprow').count() >= 4, '7. varianter sammenlignes side om side');
-  await p.locator('button', { hasText: 'Lagre som variant' }).click(); await p.waitForTimeout(600);
+  ok((await state(p)).compareIds.length >= 4, '7. varianter lagt i sammenligningen');
+  await p.locator('button', { hasText: 'Lagre som nytt scenario' }).click(); await p.waitForTimeout(600);
   ok((await state(p)).plans.some((x) => x.name === 'Min testvariant'), '7. lagre som egen variant (navngitt)');
   await p.selectOption('#plan-sel', 'plan-main'); await p.waitForTimeout(500);
 

@@ -50,7 +50,7 @@ export function SaveBanners() {
       )}
       {s.recovery && (
         <div className="banner warnb">
-          Fant ulagrede endringer fra {new Date(s.recovery.at).toLocaleString('nb-NO')} (nødkopi etter mislykket lagring).
+          Fant ulagrede endringer fra {new Date(s.recovery.at).toLocaleString('nb-NO')} (nødkopi – siden ble lukket eller lagringen feilet før endringene var skrevet).
           <button className="btn small" onClick={() => applyRecovery(true)}>Gjenopprett endringene</button>
           <button className="btn small ghost" onClick={() => applyRecovery(false)}>Ikke nå (behold som sikkerhetskopi)</button>
         </div>

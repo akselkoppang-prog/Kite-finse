@@ -55,18 +55,24 @@ export function useProfile(route: Route | undefined, step = 250) {
     if (!route) return [];
     const wps = route.waypoints;
     const cum = cumulative(wps);
-    return samples.map((s) => {
-      const z = dtm[`${s.d}`];
-      if (z != null) return { ...s, z, src: 'DTM' as const };
-      // interpoler GPX-høyde
+    const gpx = (s: Sample): number | null => {
       const i = s.seg;
       const a = wps[i], b = wps[i + 1];
       if (a?.eleGpx != null && b?.eleGpx != null) {
         const L = cum[i + 1] - cum[i];
         const t = L ? (s.d - cum[i]) / L : 0;
-        return { ...s, z: a.eleGpx + (b.eleGpx - a.eleGpx) * t, src: 'GPX' as const };
+        return a.eleGpx + (b.eleGpx - a.eleGpx) * t;
       }
-      return { ...s, z: null, src: 'ingen' as const };
+      return null;
+    };
+    const z = samples.map((s) => dtm[`${s.d}`] ?? null);
+    // ikke bland DTM og GPX punkt for punkt (gir falske topper mens DTM lastes)
+    const useDtm = z.filter((v) => v != null).length >= samples.length * 0.9;
+    return samples.map((s, i) => {
+      if (useDtm && z[i] != null) return { ...s, z: z[i], src: 'DTM' as const };
+      const g = gpx(s);
+      if (g != null) return { ...s, z: g, src: 'GPX' as const };
+      return { ...s, z: useDtm ? z[i] : null, src: z[i] != null ? ('DTM' as const) : ('ingen' as const) };
     });
   }, [samples, dtm, route]);
 

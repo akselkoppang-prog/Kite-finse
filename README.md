@@ -21,6 +21,35 @@ Krever Node 18+. Ingen API-nøkler trengs (per nov. 2026).
 **GitHub Pages:** workflowen `.github/workflows/pages.yml` bygger og publiserer ved push til `main`.
 Slå på Pages i repoets innstillinger (Settings → Pages → Source: GitHub Actions).
 
+## Versjon 6 – prosjekter, scenarioer og eksport
+
+**Prosjekter** (Oversikt → Prosjekt, eller trykk prosjektnavnet øverst)
+- Eget navn (endres når som helst – også med ✎ i oversikten), beskrivelse, fra/til, start- og sluttdato, status, ikon, forsidebilde, personlige notater og kontakter/nødinfo.
+- Flere prosjekter, hvert med egne ruter, GPX, scenarioer, vind, kites, teltplasser, punkter, vann-godkjenninger, notater og eksportvalg (egne poster i IndexedDB per prosjekt).
+- Opprett (tomt eller med Finse–Rjukan-ruten), åpne, dupliser (inkl. bilder med nye id-er), gi nytt navn, arkiver og slett. Sletting krever bekreftelse, tar en beskyttet sikkerhetskopi først og kan angres under «Nylig slettet». Det åpne prosjektet kan ikke slettes.
+
+**Scenarioer** (Dagplan → Scenarioer)
+- Hvert scenario har egen rute, vind per dag, avreise, kite per dag, fart, kitetimer, pauser, teltplasser, dagsmål og notater. Endringer i ett scenario rører aldri et annet.
+- Lagre som nytt, gi nytt navn, dupliser, sett som hovedplan (★), slett (ikke hovedplanen), del som fil og importer et delt scenario (blir et nytt scenario).
+- Sammenligning av to eller flere scenarioer: tabell (rute, distanse, dager, ankomst, distanse og reisetid per dag, kitetid, kite og vind per dag, teltplasser, notater) og kart med én farge per scenario.
+
+**Eksport & deling** (egen hovedseksjon). Alle eksporter lagrer først, tar et øyeblikksbilde av det valgte scenarioet og regner det ut på nytt – de blander aldri scenarioer og endrer aldri prosjektet.
+
+| Format | Innhold |
+|---|---|
+| PDF | A4 ekspedisjonsbrief: forside (tittel, datoer, kart/foto, nøkkeltall, scenario), oversikt med dagstabell, rutekart (liggende) med dagsfarger, punkter, teltplasser, kryssinger og alternative ruter, én side per dag (avreise, ankomst med usikkerhet, kite, vind med pil, dagslysstripe, dagskart, høydeprofil, passeringstider), teltplasser (kart, koordinater, ankomst, vurdering, alternativer, bilder), utstyr og pakkeliste, vær og vind (eget scenario vs. MET-prognose), terreng og sikkerhet (profil, godkjente/ikke vurderte kryssinger, varsler, hytter og nødutganger), kontakter, kilder, modellforutsetninger og forbehold. Topp-/bunntekst og sidetall. Varianter: Full, Kompakt, Feltbrief, Kun rute, én dag, sammenligning av scenarioer. |
+| GPX 1.1 | Hele ruten, én dag, alternativ rute eller km-segment. Full koordinatpresisjon, høyde, punktnavn/-beskrivelser, teltplasser og markører. |
+| GeoJSON | RFC 7946 (WGS 84, [lon, lat, høyde]): ruter, dagsetapper, rutepunkter, teltplasser, markører, soner og metadata. |
+| Excel (.xlsx) | Oversikt, Dagsplan, Sjekkpunkter (med forventet passering), Rutepunkter, Teltplasser, Vindscenarioer, Kites, Forutsetninger (+ Sammenligning). Skrevet uten tredjepartsbibliotek; tall lagres som tall. |
+| CSV | Rutekoordinater, dagsplan, vindscenarioer, rutepunkter. Norsk (semikolon, desimalkomma, UTF-8 med BOM) eller internasjonal. |
+| ZIP | `project/{metadata.json, project.json, routes/main-route.gpx, routes/alternative-*.gpx, scenarios/*.json, images/, attachments/, exports/, README.txt}`. Importeres som nytt prosjekt i en annen nettleser (eldre ZIP/JSON-format støttes fortsatt). |
+
+PDF-kartene bruker ekte Kartverket-fliser når nettet er tilgjengelig (eller forhåndslastede fliser). Uten fliser tegnes ruten på et nøytralt koordinatnett med tydelig merknad – aldri et oppdiktet terrengkart.
+
+**Ytelse og bruk**: sider lastes først når de åpnes (PDF-motoren ~150 kB gzip lastes bare ved eksport), færre omberegninger av planen, høydeprofilen blander ikke lenger DTM og GPX punkt for punkt (fjerner falske topper), større trykkflater og 16 px skjemafelt på iPad/iPhone (ingen auto-zoom i Safari), sammenleggbart sidepanel og større kartknapper på berøringsskjerm.
+
+Tester: `npm test` + Playwright-skript (v6: prosjekter, scenarioer og alle eksportformater med kontroll av PDF-tekst/sider, GPX-koordinater, GeoJSON, Excel via openpyxl, CSV og ZIP-reimport; iPad stående/liggende og mobil).
+
 ## Versjon 5 – enkel på overflaten
 
 Fem hovedseksjoner (avanserte verktøy ligger i undermenyer og sammenleggbare felt):

@@ -337,7 +337,16 @@ async function doInit(onStatus?: (msg: string) => void): Promise<void> {
   // nødkopi fra en mislykket lagring?
   try {
     const j: EmergencyJournal | null = JSON.parse(localStorage.getItem(EMERGENCY_KEY) || 'null');
-    if (j && j.projectId === pid && (!useSave.getState().lastSavedAt || j.at > useSave.getState().lastSavedAt!)) useSave.getState().set({ recovery: j });
+    if (j && j.projectId === pid && (!useSave.getState().lastSavedAt || j.at > useSave.getState().lastSavedAt!)) {
+      // samme innhold som allerede er lagret? Da trengs ingen gjenoppretting.
+      const st = useStore.getState() as unknown as Record<string, unknown>;
+      const same =
+        Object.entries(j.slices).every(([n, v]) => JSON.stringify(pick(st, SLICES[n] as string[])) === JSON.stringify(v)) &&
+        j.routes.every((r) => JSON.stringify(useStore.getState().routes.find((x) => x.id === r.id)) === JSON.stringify(r)) &&
+        j.deletedRoutes.every((id) => !useStore.getState().routes.some((r) => r.id === id));
+      if (same) localStorage.removeItem(EMERGENCY_KEY);
+      else useSave.getState().set({ recovery: j });
+    }
   } catch {
     /* */
   }
@@ -354,6 +363,13 @@ async function doInit(onStatus?: (msg: string) => void): Promise<void> {
   }, 10 * 60000);
   // Safari/iPad: faner suspenderes uten forvarsel – lagre straks når siden skjules
   const urgent = () => {
+    if (isDirty()) {
+      // synkron nødkopi først (localStorage) – IndexedDB rekker ikke alltid å fullføre før Safari dreper fanen.
+      // Fjernes straks den vanlige lagringen er bekreftet; ellers tilbys den ved neste oppstart.
+      const st = useStore.getState();
+      const d = dirtyRoutes(st);
+      writeEmergency(dirtySlices(st as unknown as Record<string, unknown>), d.changed, d.deleted);
+    }
     if (isDirty() || elevDirty()) void flush();
   };
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && urgent());

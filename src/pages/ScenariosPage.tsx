@@ -38,7 +38,7 @@ export default function ScenariosPage() {
             const sm = summarize(r);
             const idx = cmpIds.indexOf(p.id);
             return (
-              <article key={p.id} className={`scen ${p.id === activeId ? 'cur' : ''}`} style={idx >= 0 ? { borderLeftColor: SCENARIO_COLORS[idx % SCENARIO_COLORS.length] } : undefined}>
+              <article key={p.id} className={`scen ${p.id === activeId ? 'cur' : ''}`} aria-label={`Scenario ${p.name}`} style={idx >= 0 ? { borderLeftColor: SCENARIO_COLORS[idx % SCENARIO_COLORS.length] } : undefined}>
                 <header className="scen-head">
                   <span className="scen-badges">{p.id === mainId && <span className="pill main">★ Hovedplan</span>}{p.id === activeId && <span className="pill edit">✎ Redigeres</span>}</span>
                   <input className="scen-name" defaultValue={p.name} key={p.name} aria-label="Navn på scenario" onBlur={(e) => e.target.value.trim() && e.target.value !== p.name && renamePlan(p.id, e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />

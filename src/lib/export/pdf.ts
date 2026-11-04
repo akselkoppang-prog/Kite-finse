@@ -42,34 +42,25 @@ const C = {
 };
 const hex = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
-/** Standardfontene i PDF (WinAnsi) dekker æ ø å og vanlige tegn; resten byttes ut. */
-export function T(s: unknown): string {
-  return String(s ?? '')
-    .replace(/→|⟶|➜|➔/g, '–')
-    .replace(/←/g, '–')
-    .replace(/≈/g, 'ca. ')
-    .replace(/≥/g, '>=')
-    .replace(/≤/g, '<=')
-    .replace(/[−‐‑]/g, '-')
-    .replace(/[   ]/g, ' ')
-    .replace(/★/g, '*')
-    .replace(/[✓✔]/g, 'OK')
-    .replace(/[⚠️]/g, '!')
-    .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '')
-    .replace(/[^\x09\x0a\x0d\x20-\x7e\xa0-\xff€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]/g, '');
-}
+export { T } from './pdf-text';
+import { T } from './pdf-text';
 
 const fmtLong = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('nb-NO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const fmtShort = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: 'numeric' });
 const km = (m: number, dec = 1) => `${(m / 1000).toFixed(dec).replace('.', ',')} km`;
 const n1 = (v: number) => v.toFixed(1).replace('.', ',');
 const isReserve = (d: DayOutcome) => d.reason.startsWith('allerede');
+const kiteShortName = (id: string) => {
+  const k = KITES.find((x) => x.id === id);
+  return k ? `${k.name.split(' ').slice(1, 2).join(' ') || k.name} ${k.size} m²` : id;
+};
 
 /* ---------- sideoppsett ---------- */
 class Brief {
   doc: jsPDF;
   M = 16;
   y = 0;
+  noHeader = new Set<number>();
   sections: (string | null)[] = []; // per side: tekst i toppfeltet (null = forside, ingen topp/bunn)
   constructor(public snap: ExportSnapshot) {
     this.doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
@@ -157,8 +148,10 @@ class Brief {
       this.doc.rect(x, y + 2, 1.1, h - 4, 'F');
       this.font(7, 'bold', C.muted);
       this.doc.text(T(it.label.toUpperCase()), x + 4, y + 5.2, { charSpace: 0.3 });
-      this.font(it.value.length > 14 ? 10.5 : 13, 'bold', C.navy);
-      this.doc.text(T(it.value), x + 4, y + 11.6, { maxWidth: w - 6 });
+      let fs = 13;
+      this.font(fs, 'bold', C.navy);
+      while (fs > 7.5 && this.doc.getTextWidth(T(it.value)) > w - 6) this.font((fs -= 0.5), 'bold', C.navy);
+      this.doc.text(T(it.value), x + 4, y + 11.6);
       if (it.sub) {
         this.font(7, 'normal', C.muted);
         this.doc.text(this.doc.splitTextToSize(T(it.sub), w - 6).slice(0, 1), x + 4, y + 16);
@@ -166,14 +159,14 @@ class Brief {
     });
     this.y += rows * (h + gap) + 2;
   }
-  table(head: string[], body: (string | number)[][], o: { colWidths?: (number | 'auto')[]; fontSize?: number; colors?: (RGB | null)[]; headColor?: RGB } = {}) {
+  table(head: string[], body: (string | number)[][], o: { colWidths?: (number | 'auto')[]; fontSize?: number; colors?: (RGB | null)[]; headColor?: RGB; pad?: number } = {}) {
     autoTable(this.doc, {
       head: [head.map(T)],
       body: body.map((r) => r.map((c) => T(c))),
       startY: this.y,
       margin: { left: this.M, right: this.M, top: 22, bottom: 18 },
       theme: 'grid',
-      styles: { font: 'helvetica', fontSize: o.fontSize ?? 8.4, cellPadding: 1.6, textColor: C.ink, lineColor: C.line, lineWidth: 0.15, overflow: 'linebreak', valign: 'top' },
+      styles: { font: 'helvetica', fontSize: o.fontSize ?? 8.4, cellPadding: o.pad ?? 1.6, textColor: C.ink, lineColor: C.line, lineWidth: 0.15, overflow: 'linebreak', valign: 'top' },
       headStyles: { fillColor: o.headColor ?? C.navy, textColor: C.white, fontStyle: 'bold', fontSize: (o.fontSize ?? 8.4) - 0.2 },
       alternateRowStyles: { fillColor: [250, 251, 252] },
       columnStyles: Object.fromEntries((o.colWidths ?? []).map((w, i) => [i, { cellWidth: w }])),
@@ -214,6 +207,7 @@ class Brief {
       this.doc.setPage(i);
       if (this.sections[i - 1] === null) continue;
       const W = this.W, H = this.H;
+      if (!this.noHeader.has(i)) {
       this.doc.setFillColor(...C.navy);
       this.doc.rect(0, 0, W, 2.2, 'F');
       this.font(7.5, 'bold', C.navy);
@@ -223,6 +217,8 @@ class Brief {
       this.doc.setDrawColor(...C.line);
       this.doc.setLineWidth(0.2);
       this.doc.line(this.M, 12, W - this.M, 12);
+      }
+      this.doc.setDrawColor(...C.line);
       this.doc.line(this.M, H - 11, W - this.M, H - 11);
       this.font(7, 'normal', C.muted);
       this.doc.text(T(`${scen} · laget ${gen} · planlagte verdier, ikke verifisert i terrenget`), this.M, H - 6.5);
@@ -286,6 +282,7 @@ interface MapLayers {
   points?: { p: LatLon; label: string; color: RGB; num?: string }[];
   flags?: { p: LatLon; label: string; color: RGB }[];
   dim?: boolean; // tegn hele ruten dempet under segmentene
+  bare?: boolean; // uten ramme/målestokk/nordpil/kilde (forside)
 }
 
 /** Tegn kart (ekte fliser eller koordinatnett) med vektorlag, målestokk, nordpil og kilde. */
@@ -319,7 +316,7 @@ function drawMap(b: Brief, fr: MapFrame, x: number, y: number, w: number, h: num
     for (let lo = Math.ceil(tl.lon / stepLon) * stepLon; lo <= br.lon; lo += stepLon) {
       const [xx] = P({ lat: tl.lat, lon: lo });
       doc.line(xx, y, xx, y + h);
-      doc.text(`${lo.toFixed(2)}° Ø`, xx + 0.8, y + h - 1.5);
+      doc.text(`${lo.toFixed(2)}° Ø`, xx + 0.8, y + 3);
     }
   }
   // lett hvit slør over kartet så vektorene trer frem
@@ -331,7 +328,7 @@ function drawMap(b: Brief, fr: MapFrame, x: number, y: number, w: number, h: num
   }
   for (const o of L.others ?? []) {
     const pts = o.route.waypoints.map(P);
-    polyline(doc, pts, C.white, (o.width ?? 0.9) + 0.8);
+    polyline(doc, pts, C.white, (o.width ?? 0.9) + 0.6);
     polyline(doc, pts, o.color, o.width ?? 0.9, o.dashed ? [1.6, 1.2] : undefined);
   }
   if (L.route) {
@@ -390,6 +387,7 @@ function drawMap(b: Brief, fr: MapFrame, x: number, y: number, w: number, h: num
     doc.text(T(f.label), fx + 1.5, fy - 5.8);
   }
   doc.restoreGraphicsState();
+  if (L.bare) return;
   // ramme, målestokk, nordpil, kilde
   doc.setDrawColor(...C.navy);
   doc.setLineWidth(0.35);
@@ -549,7 +547,7 @@ async function coverPage(b: Brief, mapFrame: MapFrame | null, photo: { data: str
   doc.setFillColor(...C.navy);
   doc.rect(0, 0, W, H, 'F');
   if (photo) coverImage(doc, photo, 0, 0, W, heroH);
-  else if (mapFrame && snap.route) drawMap(b, mapFrame, 0, 0, W, heroH, { route: snap.route, segments: segs(snap), camps: snap.usedCamps, flags: [] });
+  else if (mapFrame && snap.route) drawMap(b, mapFrame, 0, 0, W, heroH, { route: snap.route, segments: segs(snap), camps: snap.usedCamps, bare: true });
   // mørk overgang for lesbar tittel
   doc.setGState(new GState({ opacity: 0.82 }));
   doc.setFillColor(...C.navy);
@@ -712,7 +710,7 @@ async function routeMapPage(b: Brief, landscape: boolean) {
   if (!snap.route) return;
   b.newPage('Rutekart', landscape ? 'landscape' : 'portrait');
   b.h1(`Rutekart – ${snap.route.name}`, 'Hele ruten');
-  const w = b.CW, h = b.bottom - b.y - (landscape ? 8 : 34);
+  const w = b.CW, h = b.bottom - b.y - (landscape ? 20 : 40);
   const others = snap.st.routes.filter((r) => r.id !== snap.route!.id && r.visible !== false).map((r) => ({ route: r, color: [59, 130, 246] as RGB, dashed: true, width: 0.7 }));
   const fr = await renderMap(snap.route.waypoints, w / h, landscape ? 2200 : 1700);
   const named = snap.route.waypoints.filter((wp) => wp.name || wp.description).slice(0, 40);
@@ -742,7 +740,9 @@ async function routeMapPage(b: Brief, landscape: boolean) {
     lx += tw;
   }
   b.y += 6;
-  if (snap.prefs.waypoints && named.length) {
+  if (snap.prefs.waypoints && named.length && named.length <= 6) {
+    b.p(`Punkter: ${named.map((wp, i) => `${i + 1} ${wp.name ?? ''}`).join(' · ')}`, { size: 7.5, color: C.muted });
+  } else if (snap.prefs.waypoints && named.length) {
     b.newPage('Rutekart');
     b.h2('Punkter i kartet');
     b.table(['Nr', 'Navn', 'Km', 'Beskrivelse / notat'], named.map((wp, i) => {
@@ -788,7 +788,7 @@ async function dayPage(b: Brief, d: DayOutcome) {
     { label: 'Ankomst', value: hhmm(d.arrival), sub: `usikkerhet ${hhmm(d.rangeArrival[0])}–${hhmm(d.rangeArrival[1])}`, color },
     { label: 'Fremdrift', value: km(d.endD - d.startD), sub: `${n1(d.rangeKm[0])}–${n1(d.rangeKm[1])} km`, color },
     { label: 'Igjen etter dagen', value: km(d.remainingKm * 1000, 0), color },
-    { label: 'Kite', value: kiteName(d.kiteId), sub: d.kiteAuto ? 'valgt automatisk' : 'ditt valg', color: C.orange },
+    { label: 'Kite', value: kiteShortName(d.kiteId), sub: `${kiteName(d.kiteId)}${d.kiteAuto ? ' · auto' : ''}`, color: C.orange },
     { label: 'Aktiv kiting', value: `${n1(pd.activeH)} t`, sub: `pauser ${n1(pd.breakH)} t · fart ${pd.speedKmh} km/t`, color: C.orange },
     { label: 'Soloppgang / -nedgang', value: `${hhmm(d.sunrise)} / ${hhmm(d.sunset)}`, sub: `${n1(sun.daylightH)} t dagslys`, color: C.amber },
     { label: 'Dagslys ved ankomst', value: d.daylightLeftH != null ? `${n1(d.daylightLeftH)} t` : '–', sub: `skumring ${hhmm(d.civilDusk)}`, color: d.daylightLeftH != null && d.daylightLeftH < 1 ? C.red : C.amber },
@@ -801,11 +801,11 @@ async function dayPage(b: Brief, d: DayOutcome) {
   b.doc.text('VIND', b.M + 26, b.y + 3.5, { charSpace: 0.5 });
   b.font(13, 'bold', C.navy);
   b.doc.text(T(`Fra ${dirName(pd.wind.dir)} (${pd.wind.dir}°) · ${n1(pd.wind.avg)} m/s`), b.M + 26, b.y + 10);
-  b.font(9, 'normal', C.ink);
-  b.doc.text(T(`Spenn ${n1(pd.wind.min)}–${n1(pd.wind.max)} m/s · kast ${n1(pd.wind.gust)} m/s · ${pd.wind.favorableH < 24 ? `denne vinden i ca. ${pd.wind.favorableH} t` : 'hele dagen'}`), b.M + 26, b.y + 15.5);
+  b.font(8.6, 'normal', C.ink);
+  b.doc.text(T(`Spenn ${n1(pd.wind.min)}–${n1(pd.wind.max)} m/s · kast ${n1(pd.wind.gust)} m/s`), b.M + 26, b.y + 15);
   const src = pd.windMode === 'manuell' ? 'EGET SCENARIO - ikke værmelding' : pd.windMode === 'prognose' ? `MET-PROGNOSE${snap.st.routeForecast ? ` (hentet ${new Date(snap.st.routeForecast.fetchedAt).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' })})` : ''}` : 'PROGNOSE + DIN JUSTERING';
   b.font(7.2, 'bold', pd.windMode === 'manuell' ? C.amber : C.green);
-  b.doc.text(T(src), b.M + 26, b.y + 21);
+  b.doc.text(T(src), b.M + 26, b.y + 20.5);
   // dagslys
   b.font(8, 'bold', C.muted);
   b.doc.text('DAGSLYS OG REISEVINDU', b.M + 105, b.y + 3.5, { charSpace: 0.5 });
@@ -813,9 +813,14 @@ async function dayPage(b: Brief, d: DayOutcome) {
   b.font(7.5, 'normal', C.muted);
   b.doc.text(T(`Reise ${hhmm(d.departure)}–${hhmm(d.arrival)} · skumring ${hhmm(d.civilDusk)}`), b.M + 105, b.y + 20);
   b.y = vy + 27;
+  const notes = [pd.note && `Notat: ${pd.note}`, camp && `Overnatting: ${camp.name}${camp.description ? ` - ${camp.description}` : ''} (${fmtDM(camp)})`, d.reason && `Modell: ${d.reason}.`, d.upwindShare > 0.2 && `${Math.round(d.upwindShare * 100)} % av strekket er mot vinden (kryssing).`, ...d.issues].filter(Boolean) as string[];
+  if (notes.length) {
+    b.h2('Viktig for dagen');
+    b.bullets(notes, 8.4);
+  }
   // kart
   if (b.snap.prefs.maps) {
-    const h = 88;
+    const h = 68;
     b.ensure(h + 8);
     const pts = [...route.waypoints.filter((_, k) => cum[k] >= d.startD - 2000 && cum[k] <= d.endD + 2000), startP, endP, ...(camp ? [camp] : [])];
     const fr = await renderMap(pts, b.CW / h, 1500, { pad: 0.12 });
@@ -830,28 +835,28 @@ async function dayPage(b: Brief, d: DayOutcome) {
     b.y += h + 7;
   }
   if (b.snap.prefs.profile) {
-    b.ensure(36);
-    profileChart(b, b.M, b.y, b.CW, 30, [d], { fromD: d.startD, toD: d.endD });
-    b.y += 35;
+    b.ensure(30);
+    profileChart(b, b.M, b.y, b.CW, 24, [d], { fromD: d.startD, toD: d.endD });
+    b.y += 29;
   }
   // sjekkpunkter
   const cps: { name: string; dd: number }[] = [];
-  for (let x = Math.ceil(d.startD / 10000) * 10000; x < d.endD - 500; x += 10000) cps.push({ name: `${Math.round(x / 1000)} km`, dd: x });
+  const cstep = Math.max(10000, Math.ceil((d.endD - d.startD) / 7 / 5000) * 5000);
+  for (let x = Math.ceil(d.startD / cstep) * cstep; x < d.endD - 500; x += cstep) cps.push({ name: `${Math.round(x / 1000)} km`, dd: x });
   route.waypoints.forEach((wp, k) => wp.name && cum[k] > d.startD + 200 && cum[k] < d.endD - 200 && cps.push({ name: wp.name, dd: cum[k] }));
   cps.sort((a, z) => a.dd - z.dd);
-  if (cps.length) {
+  // tilpass antall rader til plassen som er igjen (unngår en nesten tom ekstraside)
+  const room = Math.floor((b.bottom - b.y - 18) / 5.4);
+  const rowsCp = room >= 3 ? cps.filter((_, k) => cps.length <= room || k % Math.ceil(cps.length / room) === 0).slice(0, room) : cps.slice(0, 10);
+  if (rowsCp.length) {
     b.h2('Underveis');
-    b.table(['Punkt', 'Km', 'Forventet', 'Høyde', 'Notat'], cps.slice(0, 18).map((c) => {
+    b.table(['Punkt', 'Km', 'Forventet', 'Høyde', 'Notat'], rowsCp.map((c) => {
       const wp = route.waypoints.find((w2) => w2.name === c.name);
       const z = cachedElevation(pointAt(route.waypoints, cum, c.dd))?.z;
       return [c.name, n1(c.dd / 1000), passTime(snap, c.dd)?.time ?? '–', z != null ? `${Math.round(z)} moh` : '–', [wp?.description, wp?.notes].filter(Boolean).join(' · ')];
-    }), { colWidths: [40, 14, 20, 20, 'auto'], fontSize: 7.8 });
+    }), { colWidths: [40, 14, 20, 20, 'auto'], fontSize: 7.6, pad: 1.1 });
   }
-  const notes = [pd.note && `Notat: ${pd.note}`, camp && `Overnatting: ${camp.name}${camp.description ? ` - ${camp.description}` : ''} (${fmtDM(camp)})`, d.reason && `Modell: ${d.reason}.`, d.upwindShare > 0.2 && `${Math.round(d.upwindShare * 100)} % av strekket er mot vinden (kryssing).`, ...d.issues].filter(Boolean) as string[];
-  if (notes.length) {
-    b.h2('Viktig for dagen');
-    b.bullets(notes, 8.8);
-  }
+
 }
 
 async function campsPages(b: Brief, only?: Camp[]) {
@@ -1061,6 +1066,7 @@ function finalPage(b: Brief) {
 function briefHeader(b: Brief, title: string) {
   const { snap, doc } = b;
   b.sections[0] = 'Feltbrief';
+  b.noHeader.add(1);
   doc.setFillColor(...C.navy);
   doc.rect(0, 0, b.W, 46, 'F');
   doc.setFillColor(...C.orange);
@@ -1100,7 +1106,11 @@ export async function buildPdf(snap: ExportSnapshot, o: PdfOptions): Promise<Blo
     return b.doc.output('blob');
   }
   step('Henter kart …');
-  const coverFrame = pr.maps ? await renderMap(snap.route.waypoints, b.W / 168, 1400) : null;
+  // forsidekartet: ruten i øvre del (plass til tittelfeltet nederst)
+  const lats = snap.route.waypoints.map((w) => w.lat);
+  const span = Math.max(...lats) - Math.min(...lats);
+  const lonMid = snap.route.waypoints.reduce((a, w) => a + w.lon, 0) / snap.route.waypoints.length;
+  const coverFrame = pr.maps ? await renderMap([...snap.route.waypoints, { lat: Math.min(...lats) - span * 0.75, lon: lonMid }], b.W / 168, 1400, { pad: 0.05 }) : null;
   const photo = pr.photos ? await imageData(snap.st.project.coverBlobId) : null;
   if (preset === 'felt') {
     briefHeader(b, 'Feltbrief');
@@ -1169,7 +1179,7 @@ async function comparePdf(b: Brief, ids: string[], step: (m: string) => void): P
     const pts = runs.flatMap((r) => r.route?.waypoints ?? []);
     const w = b.CW, h = b.bottom - b.y - 12;
     const fr = await renderMap(pts, w / h, 2000);
-    const others = runs.filter((r) => r.route).map((r, i) => ({ route: r.route!, color: hex(SCENARIO_COLORS[i % SCENARIO_COLORS.length]), width: 1.6 - Math.min(0.9, i * 0.3) }));
+    const others = runs.filter((r) => r.route).map((r, i) => ({ route: r.route!, color: hex(SCENARIO_COLORS[i % SCENARIO_COLORS.length]), width: Math.max(0.6, 3.4 - i * 0.9) }));
     const flags = runs.flatMap((r, i) => {
       if (!r.route) return [];
       const cum = cumulative(r.route.waypoints);
