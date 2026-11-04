@@ -84,6 +84,12 @@ function prunedCache(name: string, st: State): unknown {
   return v;
 }
 
+/** Felt som kopieres til prosjektlisten (så listen kan vises uten å laste hvert prosjekt). */
+export function listFields(st: State) {
+  const m = st.project;
+  return { name: m.name, description: m.description, icon: m.icon, status: m.status, archived: !!m.archived, coverThumbId: m.coverThumbId, tripDate: st.tripDate, days: st.plans.find((p) => p.id === st.mainPlanId)?.days.length ?? st.tripDays };
+}
+
 function schedule() {
   if (hydrating) return;
   const s = useSave.getState();
@@ -152,7 +158,7 @@ async function doSave() {
       for (const id of deleted) ops.push(tx.objectStore('routes').delete([pid, id]));
       ops.push(tx.objectStore('meta').put({ key: `lastSaved:${pid}`, value: now }));
       const proj = await tx.objectStore('projects').get(pid);
-      if (proj) ops.push(tx.objectStore('projects').put({ ...proj, updatedAt: now }));
+      if (proj) ops.push(tx.objectStore('projects').put({ ...proj, ...listFields(st), updatedAt: now }));
       await Promise.all([...ops, tx.done]);
       refs.forEach((v, k) => lastRefs.set(k, v));
       routeRefs.forEach((r) => lastRoutes.set(r.id, r));
@@ -192,6 +198,7 @@ async function doSave() {
       error: undefined,
       warning: near ? `Lagringen er ${(100 * q!.usage / q!.quota).toFixed(0)} % full. Last ned en sikkerhetskopi og rydd under Innstillinger / Lagring.` : useSave.getState().warning,
       saves: useSave.getState().saves + 1,
+      projectName: st.project.name,
     });
     if (isDirty()) schedule();
   } catch (e) {
@@ -269,6 +276,14 @@ export async function hydrate(projectId: string) {
   const byId = new Map(routes.map((r) => [r.routeId, r.value as Route]));
   next.routes = [...order.filter((id) => byId.has(id)).map((id) => byId.get(id)!), ...[...byId.keys()].filter((id) => !order.includes(id)).map((id) => byId.get(id)!)];
   for (const c of caches) next[c.name] = c.value;
+  // eldre prosjekter uten prosjektopplysninger: bruk navnet fra prosjektlisten
+  const hasMeta = slices.some((x) => x.slice === 'project');
+  if (!hasMeta) {
+    const rec = await db.get('projects', projectId);
+    next.project = { ...(INITIAL.project as object), name: rec?.name ?? (INITIAL.project as { name: string }).name };
+  } else next.project = { ...(INITIAL.project as object), ...(next.project as object) };
+  if (!next.mainPlanId || !(next.plans as { id: string }[]).some((p) => p.id === next.mainPlanId)) next.mainPlanId = (next.plans as { id: string }[])[0]?.id;
+  if (!(next.plans as { id: string }[]).some((p) => p.id === next.activePlanId)) next.activePlanId = next.mainPlanId;
   if (elev?.value) loadElevCache(elev.value as Record<string, never>);
   useStore.setState({ ...(next as Partial<State>), selectedWp: null, selectedMarker: null, selectedBarrier: null, selectedCamp: null, dailyView: null });
   const st = useStore.getState() as unknown as Record<string, unknown>;
@@ -282,8 +297,11 @@ export async function hydrate(projectId: string) {
   if (missing.length) console.warn('Felt som ikke lagres (legg dem til i SLICES):', missing);
   const lastSavedAt = await getMeta<string>(`lastSaved:${projectId}`);
   const lastBackupAt = await getMeta<string>(`lastBackup:${projectId}`);
-  useSave.getState().set({ lastSavedAt, lastBackupAt, state: 'saved' });
+  useSave.getState().set({ lastSavedAt, lastBackupAt, state: 'saved', projectName: useStore.getState().project.name });
   hydrating = false;
+  // prosjekter uten «project»-felt: skriv det straks (vanlig autolagring)
+  if (!hasMeta) lastRefs.set('project', undefined);
+  if (isDirty()) schedule();
 }
 
 let initP: Promise<void> | null = null;

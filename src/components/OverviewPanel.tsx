@@ -4,9 +4,35 @@ import { useExpedition } from '../state/expedition';
 import { DAY_COLORS, hhmm } from '../lib/sim/expedition';
 import { dirName } from '../lib/geo';
 import { kiteShort } from './plan/KiteChips';
-import { TripStrip } from '../pages/PlannerPage';
+import { TripStrip } from './plan/TripStrip';
 import Warnings from './Warnings';
 import RoutePanel from './RoutePanel';
+import { useState } from 'react';
+
+/** Prosjektnavnet – trykk ✎ for å endre det direkte her. */
+function EditableTitle() {
+  const name = useStore((s) => s.project.name);
+  const set = useStore((s) => s.set);
+  const [edit, setEdit] = useState(false);
+  if (edit)
+    return (
+      <input
+        id="ov-title-input"
+        className="ov-title-input"
+        autoFocus
+        defaultValue={name}
+        aria-label="Prosjektnavn"
+        onBlur={(e) => { const v = e.target.value.trim(); if (v) set({ project: { ...useStore.getState().project, name: v } }); setEdit(false); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEdit(false); }}
+      />
+    );
+  return (
+    <div className="ov-title">
+      {name}
+      <button className="iconbtn" onClick={() => setEdit(true)} aria-label="Endre prosjektnavn" title="Endre prosjektnavn">✎</button>
+    </div>
+  );
+}
 
 /** Sidepanel på hovedskjermen: turen på ett blikk, dagene, varsler – og alt det tekniske bak «Rute og data». */
 export default function OverviewPanel() {
@@ -20,7 +46,8 @@ export default function OverviewPanel() {
   return (
     <div className="ovpanel">
       <section className="ov-hero">
-        <div className="ov-title">Finse → Rjukan</div>
+        <EditableTitle />
+        {s.project.description && <div className="ov-desc small">{s.project.description}</div>}
         <div className="ov-date">{new Date(`${s.tripDate}T12:00:00`).toLocaleDateString('nb-NO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · {plan.days.length} dager</div>
         <div className="ov-grid">
           <div><span>Distanse</span><b>{(stats.total / 1000).toFixed(0)} km</b></div>
@@ -29,7 +56,7 @@ export default function OverviewPanel() {
           <div><span>Teltplasser</span><b>{camps}</b></div>
         </div>
         <TripStrip days={days} total={ctx?.total ?? 1} />
-        <div className="small muted">Plan: <b>{plan.name}</b> · kites med: {s.quivers.find((q) => q.id === s.activeQuiverId)?.kiteIds.map(kiteShort).join(', ')}</div>
+        <div className="small muted">Scenario: <button className="link" onClick={() => s.setTab('scenarier')}><b>{plan.name}</b>{plan.id === s.mainPlanId ? ' ★' : ''}</button> · kites med: {s.quivers.find((q) => q.id === s.activeQuiverId)?.kiteIds.map(kiteShort).join(', ')}</div>
       </section>
 
       <section className="ov-days">
@@ -40,7 +67,7 @@ export default function OverviewPanel() {
               {d.reason.startsWith('allerede') ? <b>Reservedag</b> : <span><b>{((d.endD - d.startD) / 1000).toFixed(0)} km</b> · {hhmm(d.departure)}–{hhmm(d.arrival)}</span>}
               <small>{d.date} · 🪁 {kiteShort(d.kiteId)} · <span className="arr" style={{ display: 'inline-block', transform: `rotate(${(plan.days[i].wind.dir + 180) % 360}deg)` }}>➜</span> {dirName(plan.days[i].wind.dir)} {plan.days[i].wind.avg} m/s</small>
             </span>
-            <span className="ovd-end small">{d.remainingKm > 0.05 ? `${d.remainingKm.toFixed(0)} km igjen` : '🏁 Rjukan'}</span>
+            <span className="ovd-end small">{d.remainingKm > 0.05 ? `${d.remainingKm.toFixed(0)} km igjen` : `🏁 ${s.project.destination || 'Mål'}`}</span>
           </button>
         ))}
         <button className="btn" onClick={() => s.setTab('plan')}>Planlegg dagene →</button>

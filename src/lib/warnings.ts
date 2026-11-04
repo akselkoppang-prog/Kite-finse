@@ -5,6 +5,10 @@ import { useExpedition } from '../state/expedition';
 import { classify } from './analysis/terrain';
 import { overrideState, reviewPending } from './analysis/overrides';
 import type { LatLon } from './geo';
+import type { BarrierCheck } from '../state/derived';
+import type { TerrainAnalysis } from './analysis/terrain';
+import type { DayOutcome } from './sim/expedition';
+import type { LakeOverride } from '../types';
 
 /**
  * Rådgivende varsler i tre nivåer. Ingen av dem stopper planlegging, redigering eller simulering.
@@ -23,7 +27,12 @@ export function useWarnings(): Warning[] {
   const acks = useStore((s) => s.acks);
   const overrides = useStore((s) => s.lakeOverrides);
   const tripDate = useStore((s) => s.tripDate);
-  return useMemo(() => {
+  const destination = useStore((s) => s.project.destination);
+  return useMemo(() => computeWarnings({ check, terrain, days, acks, overrides, tripDate, destination }), [check, terrain, days, acks, overrides, tripDate, destination]);
+}
+
+/** Ren funksjon (også brukt av eksport). */
+export function computeWarnings({ check, terrain, days, acks, overrides, tripDate, destination = 'Rjukan' }: { check: BarrierCheck; terrain: TerrainAnalysis | undefined; days: DayOutcome[]; acks: Record<string, string>; overrides: LakeOverride[]; tripDate: string; destination?: string }): Warning[] {
     const w: Warning[] = [];
     for (const c of check.crossings) {
       const id = `kryss:${c.barrier.id}:${Math.round(c.fromD / 500)}`;
@@ -43,7 +52,6 @@ export function useWarnings(): Warning[] {
     } else w.push({ id: 'terreng-ikke-analysert', level: 'info', title: 'Terreng ikke analysert', text: 'Kjør terrenganalyse for helning, skredterreng og le.' });
     overrides.filter((o) => overrideState(o, tripDate) === 'aktiv' && reviewPending(o)).forEach((o) => w.push({ id: `review:${o.id}`, level: 'advarsel', title: `Gå gjennom godkjenningen av ${o.name}`, text: 'Du har bedt om en ny gjennomgang før avreise.', where: o.centroid }));
     days.forEach((d) => d.issues.forEach((t, i) => w.push({ id: `dag${d.day}:${i}:${t.slice(0, 20)}`, level: /Mangler/.test(t) ? 'viktig' : 'advarsel', title: `Dag ${d.day}`, text: t })));
-    w.push({ id: 'krossobanen', level: 'info', title: 'Krossobanen er stengt', text: 'Planlegg å gå ned fra Gvepseborg til Rjukan selv (se Utstyr & planlegging → Sikkerhet).' });
+    if (/rjukan/i.test(destination)) w.push({ id: 'krossobanen', level: 'info', title: 'Krossobanen er stengt', text: 'Planlegg å gå ned fra Gvepseborg til Rjukan selv (se Utstyr & planlegging → Sikkerhet).' });
     return w.map((x) => ({ ...x, ack: acks[x.id] })).sort((a, b) => ['viktig', 'advarsel', 'info'].indexOf(a.level) - ['viktig', 'advarsel', 'info'].indexOf(b.level));
-  }, [check, terrain, days, acks, overrides, tripDate]);
 }

@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useStore } from '../state/store';
-import { useExpedition, updatePlan, setDayCount, savePlanAs } from '../state/expedition';
-import { runExpedition, DAY_COLORS, hhmm, type DayOutcome } from '../lib/sim/expedition';
+import { useExpedition, setDayCount, savePlanAs } from '../state/expedition';
+import { hhmm, type DayOutcome } from '../lib/sim/expedition';
 import { addDays, daysBetween } from '../lib/sun';
 import { forecast } from '../lib/api/met';
 import { cumulative, pointAt } from '../lib/geo';
@@ -15,18 +15,8 @@ function summary(days: DayOutcome[]) {
   return { last, doneDay, remaining: last?.remainingKm ?? 0 };
 }
 
-/** Visuell stripe for hele turen: én farget bit per dag, grå = det som gjenstår. */
-export function TripStrip({ days, total }: { days: DayOutcome[]; total: number }) {
-  return (
-    <div className="tripstrip" role="img" aria-label="Fordeling av distansen per dag">
-      {days.map((d, i) => {
-        const w = (100 * (d.endD - d.startD)) / Math.max(1, total);
-        return w > 0 ? <div key={i} style={{ width: `${w}%`, background: DAY_COLORS[i % DAY_COLORS.length] }} title={`Dag ${d.day}: ${((d.endD - d.startD) / 1000).toFixed(0)} km`}>{w > 8 ? `D${d.day} ${((d.endD - d.startD) / 1000).toFixed(0)}` : ''}</div> : null;
-      })}
-      {days.length > 0 && days[days.length - 1].remainingKm > 0.05 && <div className="rest" style={{ width: `${(100 * days[days.length - 1].remainingKm * 1000) / total}%` }}>{days[days.length - 1].remainingKm.toFixed(0)} km igjen</div>}
-    </div>
-  );
-}
+export { TripStrip } from '../components/plan/TripStrip';
+import { TripStrip } from '../components/plan/TripStrip';
 
 export default function PlannerPage() {
   const s = useStore();
@@ -39,11 +29,6 @@ export default function PlannerPage() {
   const forecastAvailable = inHorizon && !!s.routeForecast?.points.length;
   const sm = summary(days);
   const total = ctx?.total ?? 0;
-
-  const compare = useMemo(() => {
-    if (!ctx) return [];
-    return s.plans.filter((p) => s.compareIds.includes(p.id) || p.id === plan.id).map((p) => ({ p, days: p.id === plan.id ? days : runExpedition(p, ctx) }));
-  }, [s.plans, s.compareIds, ctx, plan.id, days]);
 
   const fetchForecast = async () => {
     if (!ctx) return;
@@ -67,9 +52,9 @@ export default function PlannerPage() {
   const makeVariants = () => {
     const base = structuredClone(plan);
     const now = new Date().toISOString();
-    const vs = [35, 50, 60].map((km) => ({ ...structuredClone(base), id: uid('plan'), name: `Dag 1 = ${km} km`, createdAt: now, updatedAt: now, days: base.days.map((d, i) => (i === 0 ? { ...d, target: { mode: 'km' as const, km } } : { ...d, target: d.target.mode === 'stopp' ? d.target : { mode: 'auto' as const } })) }));
-    s.set({ plans: [...s.plans, ...vs], compareIds: [...new Set([...s.compareIds, ...vs.map((v) => v.id)])] });
-    setMsg('Tre varianter laget og lagt til sammenligningen nederst. Hovedplanen er uendret.');
+    const vs = [35, 50, 60].map((km) => ({ ...structuredClone(base), id: uid('plan'), routeId: base.routeId ?? s.activeRouteId ?? undefined, name: `Dag 1 = ${km} km`, createdAt: now, updatedAt: now, days: base.days.map((d, i) => (i === 0 ? { ...d, target: { mode: 'km' as const, km } } : { ...d, target: d.target.mode === 'stopp' ? d.target : { mode: 'auto' as const } })) }));
+    s.set({ plans: [...s.plans, ...vs], compareIds: [...new Set([...s.compareIds, plan.id, ...vs.map((v) => v.id)])] });
+    setMsg('Tre nye scenarioer laget og lagt i sammenligningen (Scenarioer). Scenarioet du redigerer er uendret.');
   };
 
   return (
@@ -86,21 +71,21 @@ export default function PlannerPage() {
               {plan.days.length > 1 && <button className="btn ghost" onClick={() => setDayCount(plan.days.length - 1)} aria-label="Fjern siste dag">−</button>}
             </div>
           </div>
-          <label className="pt-field">Plan
+          <label className="pt-field">Scenario
             <select id="plan-sel" value={plan.id} onChange={(e) => s.set({ activePlanId: e.target.value })}>
-              {s.plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {s.plans.map((p) => <option key={p.id} value={p.id}>{p.id === s.mainPlanId ? '★ ' : ''}{p.name}</option>)}
             </select>
           </label>
           <div className="pt-field">&nbsp;
             <div className="btns">
-              <button className="btn small" onClick={() => { const n = prompt('Navn på varianten', `${plan.name} – variant`); if (n) { const id = savePlanAs(n); s.set({ compareIds: [...s.compareIds, id] }); setMsg(`Lagret «${n}». Du redigerer fortsatt «${plan.name}».`); } }}>Lagre som variant</button>
+              <button className="btn small" onClick={() => { const n = prompt('Navn på det nye scenarioet', `${plan.name} – variant`); if (n) { const id = savePlanAs(n); s.set({ compareIds: [...new Set([...s.compareIds, plan.id, id])] }); setMsg(`Lagret «${n}» som eget scenario. Du redigerer fortsatt «${plan.name}».`); } }}>Lagre som nytt scenario</button>
               <button className="btn small ghost" onClick={makeVariants}>Prøv dag 1 = 35 / 50 / 60 km</button>
-              {s.plans.length > 1 && plan.id !== 'plan-main' && <button className="btn small danger" onClick={() => { if (confirm(`Slette varianten «${plan.name}»?`)) s.set({ plans: s.plans.filter((p) => p.id !== plan.id), activePlanId: s.plans.find((p) => p.id !== plan.id)!.id }); }}>Slett variant</button>}
+              <button className="btn small ghost" onClick={() => s.setTab('scenarier')}>Sammenlign …</button>
             </div>
           </div>
         </div>
         <div className="pt-result">
-          {sm.doneDay ? <b className="ok">I Rjukan dag {sm.doneDay.day} ({sm.doneDay.date}) kl. {hhmm(sm.doneDay.arrival)}</b> : <b className="warn">Mangler {sm.remaining.toFixed(0)} km etter dag {plan.days.length} – legg til en dag eller endre planen</b>}
+          {sm.doneDay ? <b className="ok">I {s.project.destination || 'mål'} dag {sm.doneDay.day} ({sm.doneDay.date}) kl. {hhmm(sm.doneDay.arrival)}</b> : <b className="warn">Mangler {sm.remaining.toFixed(0)} km etter dag {plan.days.length} – legg til en dag eller endre planen</b>}
           <span className="muted"> · {(total / 1000).toFixed(0)} km rute · {plan.days.length} dager · kites: {days.map((d) => kiteShort(d.kiteId)).join(' → ')}</span>
         </div>
         <TripStrip days={days} total={total} />
@@ -118,32 +103,7 @@ export default function PlannerPage() {
         {plan.days.map((d, i) => <DayCard key={d.id} i={i} day={d} out={days[i]} forecastAvailable={forecastAvailable} />)}
       </div>
 
-      <section className="compare card">
-        <h3>Sammenlign planer</h3>
-        <div className="seg small">
-          {s.plans.map((p) => (
-            <label key={p.id} className="chk"><input type="checkbox" checked={p.id === plan.id || s.compareIds.includes(p.id)} disabled={p.id === plan.id} onChange={(e) => s.set({ compareIds: e.target.checked ? [...s.compareIds, p.id] : s.compareIds.filter((x) => x !== p.id) })} />{p.name}</label>
-          ))}
-        </div>
-        {compare.map(({ p, days: ds }) => {
-          const m = summary(ds);
-          return (
-            <div key={p.id} className={`cmprow ${p.id === plan.id ? 'cur' : ''}`}>
-              <div className="cmphead">
-                <button className="link" onClick={() => s.set({ activePlanId: p.id })}><b>{p.name}</b></button>
-                <span className="small">{m.doneDay ? `Rjukan dag ${m.doneDay.day} kl. ${hhmm(m.doneDay.arrival)}` : <span className="warn">mangler {m.remaining.toFixed(0)} km</span>}</span>
-              </div>
-              <TripStrip days={ds} total={total} />
-              <div className="small muted">{ds.map((d) => (d.reason.startsWith('allerede') ? `D${d.day}: reservedag` : `D${d.day}: ${((d.endD - d.startD) / 1000).toFixed(0)} km, ${hhmm(d.departure)}–${hhmm(d.arrival)}, ${kiteShort(d.kiteId)}`)).join(' · ')}</div>
-            </div>
-          );
-        })}
-        {s.plans.length < 2 && <p className="small muted">Lag en variant for å sammenligne (f.eks. «Prøv dag 1 = 35 / 50 / 60 km»).</p>}
-        <div className="row small">
-          <span className="muted">Navn på aktiv plan:</span>
-          <input value={plan.name} onChange={(e) => updatePlan((x) => ({ ...x, name: e.target.value }))} aria-label="Navn på plan" />
-        </div>
-      </section>
+      <p className="small muted center">Vil du sammenligne scenarioer, gi dem nytt navn eller velge hovedplan? <button className="link" onClick={() => s.setTab('scenarier')}>Scenarioer og sammenligning →</button></p>
     </div>
   );
 }

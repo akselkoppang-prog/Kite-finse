@@ -92,7 +92,7 @@ export async function restoreBackup(id: string): Promise<void> {
 export async function referencedBlobIds(): Promise<Set<string>> {
   const ids = new Set<string>();
   const scan = (txt: string) => {
-    for (const m of txt.matchAll(/"(?:blobId|thumbId)":"([^"]+)"/g)) ids.add(m[1]);
+    for (const m of txt.matchAll(/"(?:blobId|thumbId|coverBlobId|coverThumbId)":"([^"]+)"/g)) ids.add(m[1]);
   };
   scan(JSON.stringify(projectSnapshot()));
   const db = await getDB();

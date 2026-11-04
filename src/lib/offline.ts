@@ -55,7 +55,14 @@ export async function prefetchTiles(urls: string[], onProgress: (done: number, f
       const u = urls[i++];
       try {
         if (!(await cache.match(u))) {
-          const res = await fetch(u, { mode: 'no-cors' }); // opake svar fungerer for <img>
+          // CORS først (da kan flisen også brukes i PDF-kart offline), ellers opakt svar (holder for <img>)
+          let res: Response;
+          try {
+            res = await fetch(u, { mode: 'cors' });
+            if (!res.ok) throw new Error(String(res.status));
+          } catch {
+            res = await fetch(u, { mode: 'no-cors' });
+          }
           await cache.put(u, res);
         }
         done++;

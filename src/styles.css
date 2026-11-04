@@ -518,3 +518,115 @@ input[type=range] { accent-color: var(--accent); min-height: 28px; padding: 0; b
   .ws-axis { margin: 0 68px 0 52px; }
   .ws-row { grid-template-columns: 44px 1fr 60px; }
 }
+
+/* ---------- v6: designsystem, prosjekter, scenarioer, eksport ---------- */
+:root {
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --tap: 44px;
+  --shadow: 0 6px 24px rgba(0,0,0,.35);
+  --orange: #f97316;
+}
+.center { text-align: center; }
+.btn.primary { background: var(--accent); color: #04121f; border-color: var(--accent); font-weight: 700; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.big { padding: 10px 18px; font-size: 15px; min-height: var(--tap); }
+.iconbtn { background: transparent; border: 1px solid transparent; color: var(--muted); border-radius: 8px; cursor: pointer; font-size: 15px; padding: 2px 8px; min-height: 32px; }
+.iconbtn:hover { color: var(--text); border-color: var(--line); }
+.filebtn { position: relative; overflow: hidden; display: inline-flex; align-items: center; cursor: pointer; }
+.filebtn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.pill { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; background: #1d2a44; color: var(--text); white-space: nowrap; }
+.pill.main { background: #3a2a06; color: #fde68a; }
+.pill.edit { background: #0c3350; color: #7dd3fc; }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.msg { color: var(--user); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* prosjektmerke i toppen */
+.projbadge { display: flex; align-items: center; gap: 10px; background: transparent; border: 1px solid transparent; border-radius: var(--r-md); padding: 4px 8px 4px 4px; color: var(--text); cursor: pointer; text-align: left; min-width: 0; max-width: min(520px, 62vw); }
+.projbadge:hover { border-color: var(--line); background: var(--bg2); }
+.projbadge .logo.img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
+.pb-txt { display: flex; flex-direction: column; min-width: 0; }
+.pb-txt .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-txt .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-switch { color: var(--accent); margin-left: 4px; }
+.ov-title { display: flex; align-items: center; gap: 4px; }
+.ov-title-input { font-size: 18px; font-weight: 800; width: 100%; padding: 6px 8px; }
+.ov-desc { color: #cbd5e1; }
+
+/* prosjekter */
+.projdetails .pd-grid { display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
+.pd-cover { display: flex; flex-direction: column; gap: 8px; }
+.pcover { width: 64px; height: 64px; border-radius: 12px; background: linear-gradient(160deg, #13406b, #0e1729); display: flex; align-items: center; justify-content: center; font-size: 30px; overflow: hidden; flex-shrink: 0; }
+.pcover.big { width: 100%; height: 170px; font-size: 64px; }
+.pcover img { width: 100%; height: 100%; object-fit: cover; }
+.iconpick { display: flex; flex-wrap: wrap; gap: 4px; }
+.iconpick button { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: #0e1729; font-size: 20px; cursor: pointer; }
+.iconpick button.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(56,189,248,.35); }
+.form1 input.big { font-size: 17px; font-weight: 700; padding: 8px 10px; }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.pcard { background: #0e1729; border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.pcard.cur { border-color: var(--accent); }
+.pcard.arch { opacity: .7; border-style: dashed; }
+.pcard-main { display: flex; gap: 10px; align-items: flex-start; background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; padding: 0; }
+.pcard-main:disabled { cursor: default; }
+.pcard-txt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.pcard-txt b { font-size: 15px; }
+.newproj { background: #0e1729; border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; }
+
+/* scenarioer */
+.scenlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
+.scen { background: #0e1729; border: 1px solid var(--line); border-left: 5px solid var(--line); border-radius: var(--r-md); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.scen.cur { box-shadow: 0 0 0 1px var(--accent); }
+.scen-head { display: flex; flex-direction: column; gap: 4px; }
+.scen-badges { display: flex; gap: 4px; min-height: 18px; }
+.scen-name { font-size: 15px; font-weight: 700; background: transparent; border-color: transparent; padding: 4px 6px; width: 100%; }
+.scen-name:focus, .scen-name:hover { border-color: var(--line); background: #0b1424; }
+.scen-note { min-height: 44px; }
+.cmpchk { margin-left: auto; align-self: center; }
+.cmptable { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.cmptable th, .cmptable td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.cmptable thead th { position: sticky; top: 0; background: var(--card); white-space: nowrap; }
+.cmptable tbody th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.cmptable td div + div { margin-top: 2px; }
+.cmptable .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.scenmap { height: 380px; border-radius: var(--r-md); overflow: hidden; margin-top: 10px; border: 1px solid var(--line); }
+
+/* eksport */
+.presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.preset { display: flex; flex-direction: column; gap: 4px; text-align: left; background: #0e1729; color: var(--text); border: 1.5px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; cursor: pointer; min-height: 72px; }
+.preset small { color: var(--muted); font-size: 11.5px; }
+.preset.on { border-color: var(--accent); background: #0c2a44; }
+.incgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px 12px; margin: 8px 0; }
+.exportpage .card .btn { min-height: 38px; }
+.exportpage select { min-height: 38px; }
+
+/* berøringsskjerm (iPad/iPhone): større trykkflater og kartkontroller */
+@media (pointer: coarse) {
+  .btn { min-height: 40px; padding: 8px 12px; font-size: 13.5px; }
+  .btn.small { min-height: 36px; padding: 6px 10px; font-size: 12.5px; }
+  input, select { min-height: 38px; font-size: 16px; } /* 16px hindrer zoom ved fokus i iOS Safari */
+  textarea { font-size: 16px; }
+  .chk { min-height: 32px; align-items: center; }
+  .chk input[type=checkbox] { width: 20px; height: 20px; }
+  .leaflet-touch .leaflet-bar a { width: 40px; height: 40px; line-height: 40px; font-size: 20px; }
+  .link { min-height: 32px; }
+}
+/* nettbrett: stort kart, smalere sidepanel som kan skjules */
+@media (min-width: 701px) and (max-width: 1180px) {
+  .side { width: 320px; }
+  .mapwrap { height: calc(100dvh - 150px); }
+}
+.modal-box { max-height: 90dvh; overflow: auto; }
+.drawer { max-height: min(calc(100% - 20px), 80dvh); }
+@media (max-width: 900px) {
+  .projdetails .pd-grid { grid-template-columns: 1fr; }
+  .pcover.big { height: 140px; }
+  .scenlist, .pgrid { grid-template-columns: 1fr; }
+  .scenmap { height: 300px; }
+}
+@media (max-width: 560px) {
+  .row2 { grid-template-columns: 1fr; }
+  .projbadge { max-width: calc(100vw - 150px); }
+  .pb-txt .sub { display: none; }
+}

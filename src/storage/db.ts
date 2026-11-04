@@ -16,7 +16,21 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 export const DB_NAME = 'kite-finse-rjukan';
 export const DB_VERSION = 1;
 
-export interface ProjectRec { id: string; name: string; createdAt: string; updatedAt: string; schema: number }
+export interface ProjectRec {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  schema: number;
+  // kopi av noen prosjektopplysninger for prosjektlisten (kilden er «project»-feltet i prosjektdataene)
+  description?: string;
+  icon?: string;
+  status?: string;
+  archived?: boolean;
+  coverThumbId?: string;
+  tripDate?: string;
+  days?: number;
+}
 export interface SliceRec { projectId: string; slice: string; value: unknown; updatedAt: string; size: number }
 export interface RouteRec { projectId: string; routeId: string; value: unknown; updatedAt: string; size: number }
 export interface CacheRec { projectId: string; name: string; value: unknown; updatedAt: string; size: number }

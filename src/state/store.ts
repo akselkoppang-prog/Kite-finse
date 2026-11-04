@@ -16,8 +16,9 @@ import type { NveHydro, PolyFeature } from '../lib/api/nve';
 import type { TerrainAnalysis } from '../lib/analysis/terrain';
 import type { Snow, Terrain, Goal } from '../lib/analysis/kite';
 import { uid } from '../lib/geo';
+import { DEFAULT_PROJECT, DEFAULT_EXPORT, type ProjectMeta, type ExportPrefs } from '../lib/project/meta';
 
-export type Tab = 'kart' | 'simulator' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder' | 'modell' | 'lagring' | 'oversikt' | 'plan' | 'vaerkite';
+export type Tab = 'kart' | 'simulator' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder' | 'modell' | 'lagring' | 'oversikt' | 'plan' | 'vaerkite' | 'prosjekt' | 'prosjekter' | 'eksport' | 'scenarier';
 
 export interface SimUI {
   startDay: number;
@@ -124,6 +125,9 @@ export interface State {
   plans: PlanScenario[];
   activePlanId: string;
   compareIds: string[];
+  mainPlanId: string;
+  project: ProjectMeta;
+  exportPrefs: ExportPrefs;
 
   set: (p: Partial<State>) => void;
   setTab: (t: Tab) => void;
@@ -241,6 +245,9 @@ export const useStore = create<State>()(
       plans: [examplePlan()],
       activePlanId: 'plan-main',
       compareIds: [],
+      mainPlanId: 'plan-main',
+      project: DEFAULT_PROJECT,
+      exportPrefs: DEFAULT_EXPORT,
 
       set: (p) => set(p),
       setTab: (tab) => set({ tab }),

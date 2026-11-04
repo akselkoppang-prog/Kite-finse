@@ -10,9 +10,11 @@ import type { Route } from '../types';
 
 const now = () => new Date().toISOString();
 
-export async function loadInitialGpx() {
+/** Laster Finse–Rjukan-GPX-en inn i prosjektet første gang (ikke i nye, tomme prosjekter). */
+export async function loadInitialGpx(force = false) {
   const st = useStore.getState();
   if (st.routes.some((r) => r.kind === 'gpx')) return;
+  if (!force && st.project.seedGpx === false) return;
   const res = await fetch('data/Finse_Rjukan_kite_27.gpx');
   const xml = await res.text();
   const parsed = parseGpx(xml, 'Brukers GPX «Finse Rjukan kite 27» (Garmin Explore, 2026-11-03)');

@@ -37,7 +37,16 @@ export interface DayPlan {
   note?: string;
 }
 
-export interface PlanScenario { id: string; name: string; days: DayPlan[]; createdAt: string; updatedAt: string }
+export interface PlanScenario {
+  id: string;
+  name: string;
+  days: DayPlan[];
+  createdAt: string;
+  updatedAt: string;
+  /** Ruten scenarioet bruker (mangler = aktiv rute da scenarioet ble laget). */
+  routeId?: string;
+  note?: string;
+}
 
 export const DAY_COLORS = ['#f97316', '#22d3ee', '#a3e635', '#f472b6', '#facc15', '#a78bfa', '#34d399'];
 
@@ -259,4 +268,8 @@ export function runExpedition(plan: PlanScenario, ctx: PlanContext): DayOutcome[
   return out;
 }
 
-export const hhmm = (h: number | null | undefined) => (h == null || !Number.isFinite(h) ? '–' : `${String(Math.floor(((h % 24) + 24) % 24)).padStart(2, '0')}:${String(Math.round((h % 1) * 60) % 60).padStart(2, '0')}`);
+export const hhmm = (h: number | null | undefined) => {
+  if (h == null || !Number.isFinite(h)) return '–';
+  const m = ((Math.round(h * 60) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+};

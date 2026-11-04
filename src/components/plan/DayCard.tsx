@@ -81,14 +81,14 @@ export default function DayCard({ i, day, out, forecastAvailable }: { i: number;
       </header>
 
       {done ? (
-        <p className="ok">Du er allerede i Rjukan etter forrige dag – dette er en reservedag.</p>
+        <p className="ok">Du er allerede i {s.project.destination || 'mål'} etter forrige dag – dette er en reservedag.</p>
       ) : (
         <>
           <div className="dc-tiles">
             <div className="tile big"><span>Fremdrift langs ruten</span><b>{(out.endD / 1000 - out.startD / 1000).toFixed(0)} km</b><small>usikkerhet {out.rangeKm[0].toFixed(0)}–{out.rangeKm[1].toFixed(0)} km</small></div>
             <div className="tile"><span>Ankomst</span><b>{hhmm(out.arrival)}</b><small>{hhmm(out.rangeArrival[0])}–{hhmm(out.rangeArrival[1])}</small></div>
             <div className="tile"><span>Dagslys igjen</span><b className={out.daylightLeftH != null && out.daylightLeftH < 1 ? 'err' : ''}>{out.daylightLeftH != null ? `${out.daylightLeftH.toFixed(1)} t` : '–'}</b><small>sol ned {hhmm(out.sunset)}</small></div>
-            <div className="tile"><span>Igjen til Rjukan</span><b>{out.remainingKm.toFixed(0)} km</b><small>{out.reason}</small></div>
+            <div className="tile"><span>Igjen til {s.project.destination || 'mål'}</span><b>{out.remainingKm.toFixed(0)} km</b><small>{out.reason}</small></div>
           </div>
           <div className="dc-bars" title="Teoretisk bevegelse = fart × timer. Fremdrift = det du faktisk kommer nærmere målet langs ruten.">
             <div className="bar"><span>Teoretisk bevegelse ({day.speedKmh} km/t × {day.activeH} t)</span><i style={{ width: '100%' }} /><b>{out.theoreticalKm.toFixed(0)} km</b></div>

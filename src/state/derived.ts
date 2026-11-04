@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useStore, routeHash } from './store';
+import { useStore, routeHash, type State } from './store';
 import { cumulative, densify, type Sample } from '../lib/geo';
 import { elevations, cachedElevation } from '../lib/api/kartverket';
 import { buildBarriers, findCrossings, elevationBandWarnings, type Barrier, type Crossing } from '../lib/analysis/barriers';
@@ -88,6 +88,25 @@ export function useProfile(route: Route | undefined, step = 250) {
   return { profile, stats, ...state };
 }
 
+/** Barrierer + kryssinger for en rute (ren funksjon – brukes også av eksport). */
+export function computeBarrierCheck(st: Pick<State, 'hydro' | 'lakes' | 'zones' | 'userVerifiedLakes' | 'lakeOverrides' | 'tripDate'>, route: Route | undefined) {
+  const { hydro, zones, userVerifiedLakes: userVerified, lakeOverrides: overrides, tripDate } = st;
+  const lakeEntry = st.lakes[routeHash(route)];
+  const barriers: Barrier[] = buildBarriers(hydro?.reservoirs ?? [], lakeEntry?.lakes ?? [], zones, userVerified);
+  const raw: Crossing[] = route ? findCrossings(route.waypoints, barriers) : [];
+  const crossings = evaluateCrossings(raw, overrides, { routeId: route?.id ?? '', tripDate, dams: (hydro?.dams ?? []) as Feature[] });
+  const bandWarnings = route ? elevationBandWarnings(route.waypoints) : [];
+  const waterChecked = !!hydro && !!lakeEntry;
+  const blocking = crossings.filter((c) => c.blocking);
+  const userApproved = crossings.filter((c) => c.label === 'BRUKERGODKJENT');
+  const activeOverrideKeys = new Set(overrides.filter((o) => overrideState(o, tripDate) === 'aktiv').map((o) => o.barrierKey));
+  let status: Status = 'GRÅ';
+  if (waterChecked) status = blocking.length ? 'RØD' : crossings.length || bandWarnings.length ? 'GUL' : 'GRØNN';
+  else if (blocking.length || bandWarnings.length) status = 'RØD';
+  return { barriers, crossings, blocking, userApproved, activeOverrideKeys, bandWarnings, waterChecked, status, hydroAt: hydro?.fetchedAt, lakesAt: lakeEntry?.fetchedAt };
+}
+export type BarrierCheck = ReturnType<typeof computeBarrierCheck>;
+
 /** Barrierer + kryssinger for aktiv rute, inkl. dine overstyringer (whitelist). */
 export function useBarrierCheck(route: Route | undefined) {
   const hydro = useStore((s) => s.hydro);
@@ -98,20 +117,7 @@ export function useBarrierCheck(route: Route | undefined) {
   const tripDate = useStore((s) => s.tripDate);
   const hash = routeHash(route);
   const lakeEntry = lakesAll[hash];
-  return useMemo(() => {
-    const barriers: Barrier[] = buildBarriers(hydro?.reservoirs ?? [], lakeEntry?.lakes ?? [], zones, userVerified);
-    const raw: Crossing[] = route ? findCrossings(route.waypoints, barriers) : [];
-    const crossings = evaluateCrossings(raw, overrides, { routeId: route?.id ?? '', tripDate, dams: (hydro?.dams ?? []) as Feature[] });
-    const bandWarnings = route ? elevationBandWarnings(route.waypoints) : [];
-    const waterChecked = !!hydro && !!lakeEntry;
-    const blocking = crossings.filter((c) => c.blocking);
-    const userApproved = crossings.filter((c) => c.label === 'BRUKERGODKJENT');
-    const activeOverrideKeys = new Set(overrides.filter((o) => overrideState(o, tripDate) === 'aktiv').map((o) => o.barrierKey));
-    let status: Status = 'GRÅ';
-    if (waterChecked) status = blocking.length ? 'RØD' : crossings.length || bandWarnings.length ? 'GUL' : 'GRØNN';
-    else if (blocking.length || bandWarnings.length) status = 'RØD';
-    return { barriers, crossings, blocking, userApproved, activeOverrideKeys, bandWarnings, waterChecked, status, hydroAt: hydro?.fetchedAt, lakesAt: lakeEntry?.fetchedAt };
-  }, [hash, hydro, lakeEntry, zones, userVerified, overrides, tripDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  return useMemo(() => computeBarrierCheck({ hydro, lakes: lakesAll, zones, userVerifiedLakes: userVerified, lakeOverrides: overrides, tripDate }, route), [hash, hydro, lakeEntry, zones, userVerified, overrides, tripDate]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 export function useActiveRoute() {

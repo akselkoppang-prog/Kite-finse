@@ -5,6 +5,8 @@ import { projectSnapshot, createBackup } from './backup';
 import { extractImages, writeStateAsProject } from './migrate';
 import { CACHE_KEYS } from './slices';
 import { toGpx } from '../lib/gpx';
+import { scenarioFile } from '../state/expedition';
+import { slug } from '../lib/project/meta';
 import { uid } from '../lib/geo';
 import type { Route } from '../types';
 
@@ -24,7 +26,7 @@ async function projectBlobs(projectId: string): Promise<BlobRec[]> {
 
 function referenced(snapshot: unknown): Set<string> {
   const ids = new Set<string>();
-  for (const m of JSON.stringify(snapshot).matchAll(/"(?:blobId|thumbId)":"([^"]+)"/g)) ids.add(m[1]);
+  for (const m of JSON.stringify(snapshot).matchAll(/"(?:blobId|thumbId|coverBlobId|coverThumbId)":"([^"]+)"/g)) ids.add(m[1]);
   return ids;
 }
 
@@ -70,32 +72,80 @@ export async function exportJson(projectId: string, name: string, opts: { includ
 
 const safe = (s: string) => s.replace(/[^\wæøåÆØÅ.-]+/g, '_').slice(0, 60);
 
-/** ZIP-arkiv med alt: prosjekt, metadata, ruter som GPX, bilder og vedlegg. */
-export async function exportZip(projectId: string, name: string, includeCaches = false): Promise<Blob> {
+const README = (name: string, at: string) => `${name}
+${'='.repeat(Math.min(60, name.length))}
+
+Fullstendig prosjektkopi fra snowkite-ekspedisjonsplanleggeren (eksportert ${at}).
+
+Slik åpner du prosjektet på en annen enhet:
+  Prosjekt → «Importer prosjekt (ZIP/JSON)» → velg denne ZIP-filen.
+  Prosjektet importeres som et NYTT prosjekt – ingenting eksisterende overskrives.
+
+Innhold
+  project/project.json   Kilden ved import: alle ruter, scenarioer, dagplaner, vind, kites,
+                         teltplasser, punkter, vann-godkjenninger, notater og eksportvalg.
+  project/metadata.json  Versjon, antall og oversikt over bilder/vedlegg.
+  project/routes/        Rutene som GPX 1.1 med full koordinatpresisjon (Garmin, GPS, kartapper).
+                         main-route.gpx = ruten hovedplanen bruker.
+  project/scenarios/     Hvert scenario som egen fil – kan deles og importeres enkeltvis
+                         (Dagplan → Scenarioer → «Importer delt scenario»).
+  project/images/        Bilder (originaler) og miniatyrer (images/thumbs/).
+  project/attachments/   Andre vedlegg.
+  project/exports/       Ferdige eksporter (GeoJSON, CSV, Excel, PDF) hvis du valgte det.
+
+GPX kan ikke lagre alt (bilder, statuser, scenarioer); alt dette ligger i project.json.
+Formatversjon: ${FORMAT} v${VERSION}.
+`;
+
+/** ZIP-arkiv med alt: prosjekt, metadata, ruter som GPX, scenarioer, bilder, vedlegg og (valgfritt) ferdige eksporter. */
+export async function exportZip(projectId: string, name: string, includeCaches = false, extraExports: Record<string, Uint8Array> = {}): Promise<Blob> {
   const pj = projectJson(name, includeCaches);
   const st = useStore.getState();
   const used = referenced(pj);
   const blobs = (await projectBlobs(projectId)).filter((b) => used.has(b.id));
+  const R = 'project/';
   const files: Record<string, Uint8Array> = {};
-  files['project.json'] = strToU8(JSON.stringify(pj));
+  files[`${R}project.json`] = strToU8(JSON.stringify(pj));
   const ext = (m: string) => (m.includes('png') ? 'png' : m.includes('webp') ? 'webp' : 'jpg');
   const index: Record<string, unknown> = {};
   for (const b of blobs) {
     const path = b.kind === 'bilde' ? (b.role === 'thumb' ? `images/thumbs/${b.id}.${ext(b.mime)}` : `images/${b.id}.${ext(b.mime)}`) : `attachments/${b.id}_${safe(b.name)}`;
-    files[path] = new Uint8Array(await b.blob.arrayBuffer());
+    files[R + path] = new Uint8Array(await b.blob.arrayBuffer());
     index[b.id] = { path, name: b.name, mime: b.mime, role: b.role, parentId: b.parentId, kind: b.kind, hash: b.hash, width: b.width, height: b.height, size: b.size };
   }
-  st.routes.forEach((r, i) => (files[`routes/${String(i + 1).padStart(2, '0')}_${safe(r.name)}.gpx`] = strToU8(toGpx([r], i === 0 ? st.camps : [], i === 0 ? st.markers : []))));
-  files['attachments/LESMEG.txt'] = strToU8('Vedlegg (ikke-bilder) lagres her. Lenker ligger i project.json.');
-  files['metadata.json'] = strToU8(
+  // ruter: hovedplanens rute = main-route.gpx
+  const main = st.plans.find((p) => p.id === st.mainPlanId);
+  const mainRoute = st.routes.find((r) => r.id === main?.routeId) ?? st.routes.find((r) => r.id === st.activeRouteId) ?? st.routes[0];
+  const usedNames = new Set<string>();
+  st.routes.forEach((r) => {
+    let fn = r.id === mainRoute?.id ? 'main-route' : `alternative-${slug(r.name)}`;
+    while (usedNames.has(fn)) fn += '-2';
+    usedNames.add(fn);
+    files[`${R}routes/${fn}.gpx`] = strToU8(toGpx([r], r.id === mainRoute?.id ? st.camps : [], r.id === mainRoute?.id ? st.markers : []));
+  });
+  // scenarioer
+  const scenNames = new Set<string>();
+  st.plans.forEach((p) => {
+    let fn = `${p.id === st.mainPlanId ? 'hovedplan-' : ''}${slug(p.name)}`;
+    while (scenNames.has(fn)) fn += '-2';
+    scenNames.add(fn);
+    files[`${R}scenarios/${fn}.json`] = strToU8(JSON.stringify(scenarioFile(p.id), null, 2));
+  });
+  for (const [k, v] of Object.entries(extraExports)) files[`${R}exports/${k}`] = v;
+  if (!Object.keys(extraExports).length) files[`${R}exports/LESMEG.txt`] = strToU8('Ferdige eksporter (PDF, GeoJSON, CSV, Excel) legges her når du velger det i Eksport & deling.');
+  files[`${R}attachments/LESMEG.txt`] = strToU8('Vedlegg (ikke-bilder) lagres her. Lenker ligger i project.json.');
+  files[`${R}README.txt`] = strToU8(README(name, String(pj.exportedAt)));
+  files[`${R}metadata.json`] = strToU8(
     JSON.stringify({
       format: FORMAT,
       version: VERSION,
       exportedAt: pj.exportedAt,
       name,
-      counts: { routes: st.routes.length, waypoints: st.routes.reduce((a, r) => a + r.waypoints.length, 0), camps: st.camps.length, markers: st.markers.length, lakeOverrides: st.lakeOverrides.length, images: blobs.filter((b) => b.role === 'main').length },
+      project: st.project,
+      mainScenario: main?.name,
+      counts: { routes: st.routes.length, scenarios: st.plans.length, waypoints: st.routes.reduce((a, r) => a + r.waypoints.length, 0), camps: st.camps.length, markers: st.markers.length, lakeOverrides: st.lakeOverrides.length, images: blobs.filter((b) => b.role === 'main').length },
       blobs: index,
-      note: 'Rutene i routes/ er GPX 1.1 med full koordinatpresisjon (7 desimaler). project.json er kilden ved import.',
+      note: 'Stier i «blobs» er relative til mappen project/. Rutene i routes/ er GPX 1.1 med full koordinatpresisjon. project.json er kilden ved import.',
     }, null, 2),
   );
   const zipped = zipSync(files, { level: 6 });
@@ -112,11 +162,15 @@ async function readFile(file: File | Blob): Promise<{ state: Record<string, unkn
   let pj: Record<string, unknown>;
   if (isZip) {
     const files = unzipSync(new Uint8Array(await file.arrayBuffer()));
-    if (!files['project.json']) throw new Error('ZIP-filen mangler project.json');
-    pj = JSON.parse(strFromU8(files['project.json']));
-    const meta = files['metadata.json'] ? JSON.parse(strFromU8(files['metadata.json'])) : { blobs: {} };
+    // project.json i roten (eldre arkiv) eller i en mappe (project/project.json)
+    const pjPath = files['project.json'] ? 'project.json' : Object.keys(files).filter((k) => k.endsWith('/project.json')).sort((a, b) => a.length - b.length)[0];
+    if (!pjPath) throw new Error('ZIP-filen mangler project.json');
+    const root = pjPath.slice(0, pjPath.length - 'project.json'.length);
+    pj = JSON.parse(strFromU8(files[pjPath]));
+    const metaRaw = files[`${root}metadata.json`];
+    const meta = metaRaw ? JSON.parse(strFromU8(metaRaw)) : { blobs: {} };
     for (const [id, m] of Object.entries(meta.blobs ?? {}) as [string, { path: string; name: string; mime: string; role: 'main' | 'thumb'; parentId?: string; kind: 'bilde' | 'vedlegg'; hash: string; width?: number; height?: number }][]) {
-      const data = files[m.path];
+      const data = files[root + m.path] ?? files[m.path];
       if (!data) continue;
       const blob = new Blob([data], { type: m.mime });
       images.push({ id, rec: { id, kind: m.kind, role: m.role, parentId: m.parentId, name: m.name, mime: m.mime, size: blob.size, hash: m.hash, blob, width: m.width, height: m.height, createdAt: new Date().toISOString() } });

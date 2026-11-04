@@ -1,40 +1,46 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useStore, type Tab } from './state/store';
 import { loadInitialGpx } from './lib/actions';
 import MapView from './components/MapView';
 import LayerPanel from './components/LayerPanel';
 import ElevationProfile from './components/ElevationProfile';
-import SubgoalTable from './components/SubgoalTable';
-import CompareTable from './components/CompareTable';
-import WindPage from './pages/WindPage';
-import KitePage from './pages/KitePage';
-import SafetyPage from './pages/SafetyPage';
-import DayPlanPage from './pages/DayPlanPage';
-import TimelinePage from './pages/TimelinePage';
-import SourcesPage from './pages/SourcesPage';
-import OverridesPage from './pages/OverridesPage';
-import GearPage from './pages/GearPage';
 import LakePanel from './components/LakePanel';
 import WaypointPanel from './components/WaypointPanel';
-import SimulatorPage from './pages/SimulatorPage';
-import ModelPage from './pages/ModelPage';
 import CampPanel from './components/CampPanel';
 import { SimPlayer } from './components/sim/SimPlayer';
-import StoragePage from './pages/StoragePage';
-import PlannerPage from './pages/PlannerPage';
-import WeatherKitePage from './pages/WeatherKitePage';
 import OverviewPanel from './components/OverviewPanel';
 import { ExpeditionProvider, useExpedition } from './state/expedition';
 import { useWarnings } from './lib/warnings';
 import { hhmm } from './lib/sim/expedition';
 import { SaveIndicator, SaveBanners } from './components/SaveStatus';
+import { useBlobUrl } from './storage/blobs';
 
-type Main = 'oversikt' | 'plan' | 'vaerkite' | 'utstyr' | 'innstillinger';
+// sider som ikke trengs ved oppstart lastes først når de åpnes (raskere start, særlig på iPad)
+const PlannerPage = lazy(() => import('./pages/PlannerPage'));
+const WeatherKitePage = lazy(() => import('./pages/WeatherKitePage'));
+const WindPage = lazy(() => import('./pages/WindPage'));
+const KitePage = lazy(() => import('./pages/KitePage'));
+const SafetyPage = lazy(() => import('./pages/SafetyPage'));
+const DayPlanPage = lazy(() => import('./pages/DayPlanPage'));
+const TimelinePage = lazy(() => import('./pages/TimelinePage'));
+const SourcesPage = lazy(() => import('./pages/SourcesPage'));
+const OverridesPage = lazy(() => import('./pages/OverridesPage'));
+const GearPage = lazy(() => import('./pages/GearPage'));
+const SimulatorPage = lazy(() => import('./pages/SimulatorPage'));
+const ModelPage = lazy(() => import('./pages/ModelPage'));
+const StoragePage = lazy(() => import('./pages/StoragePage'));
+const ScenariosPage = lazy(() => import('./pages/ScenariosPage'));
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const ExportPage = lazy(() => import('./pages/ExportPage'));
+const TechDetails = lazy(() => import('./components/TechDetails'));
+
+type Main = 'oversikt' | 'plan' | 'vaerkite' | 'utstyr' | 'eksport' | 'innstillinger';
 const SECTIONS: { id: Main; label: string; short?: string; icon: string; subs: [Tab, string][] }[] = [
-  { id: 'oversikt', label: 'Oversikt', icon: '🗺️', subs: [['oversikt', 'Kart og rute']] },
-  { id: 'plan', label: 'Dagplan', icon: '📅', subs: [['plan', 'Dagene'], ['tidslinje', 'Kalender og sol'], ['dagplan', 'Avansert dagsfordeling']] },
+  { id: 'oversikt', label: 'Oversikt', icon: '🗺️', subs: [['oversikt', 'Kart og rute'], ['prosjekter', 'Prosjekt']] },
+  { id: 'plan', label: 'Dagplan', icon: '📅', subs: [['plan', 'Dagene'], ['scenarier', 'Scenarioer'], ['tidslinje', 'Kalender og sol'], ['dagplan', 'Avansert dagsfordeling']] },
   { id: 'vaerkite', label: 'Vær & kite', icon: '🪁', subs: [['vaerkite', 'Kite og vind'], ['vind', 'Værmelding'], ['simulator', 'Simulator'], ['kite', 'Kitedatabase']] },
   { id: 'utstyr', label: 'Utstyr & planlegging', short: 'Utstyr', icon: '🎒', subs: [['utstyr', 'Utstyr og mat'], ['sikkerhet', 'Sikkerhet'], ['overstyring', 'Vann-godkjenninger']] },
+  { id: 'eksport', label: 'Eksport & deling', short: 'Eksport', icon: '📤', subs: [['eksport', 'Eksport & deling']] },
   { id: 'innstillinger', label: 'Innstillinger', short: 'Oppsett', icon: '⚙️', subs: [['lagring', 'Lagring og backup'], ['kilder', 'Datakilder'], ['modell', 'Modell og kalibrering']] },
 ];
 const mainOf = (t: Tab): Main => (t === 'kart' ? 'oversikt' : SECTIONS.find((s) => s.subs.some(([x]) => x === t))?.id ?? 'oversikt');
@@ -43,6 +49,7 @@ function HeaderSummary() {
   const { plan, days } = useExpedition();
   const warnings = useWarnings();
   const tripDate = useStore((s) => s.tripDate);
+  const dest = useStore((s) => s.project.destination);
   const setTab = useStore((s) => s.setTab);
   const done = days.find((d) => d.remainingKm <= 0.05);
   const imp = warnings.filter((w) => w.level === 'viktig' && !w.ack).length;
@@ -50,9 +57,25 @@ function HeaderSummary() {
   return (
     <div className="hsum">
       <button className="hs" onClick={() => setTab('plan')}>📅 {new Date(`${tripDate}T12:00:00`).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })} · {plan.days.length} dager</button>
-      <button className="hs" onClick={() => setTab('plan')}>{done ? `🏁 Rjukan dag ${done.day} kl. ${hhmm(done.arrival)}` : `⏳ ${days[days.length - 1]?.remainingKm.toFixed(0) ?? '–'} km igjen`}</button>
+      <button className="hs" onClick={() => setTab('plan')}>{done ? `🏁 ${dest || 'Mål'} dag ${done.day} kl. ${hhmm(done.arrival)}` : `⏳ ${days[days.length - 1]?.remainingKm.toFixed(0) ?? '–'} km igjen`}</button>
       {(imp > 0 || adv > 0) && <button className="hs warnhs" onClick={() => setTab('oversikt')}>⚠️ {imp ? `${imp} viktige · ` : ''}{adv} advarsler</button>}
     </div>
+  );
+}
+
+/** Prosjektnavn i toppen – trykk for å bytte eller endre prosjekt. */
+function ProjectBadge() {
+  const p = useStore((s) => s.project);
+  const setTab = useStore((s) => s.setTab);
+  const cover = useBlobUrl(p.coverThumbId);
+  return (
+    <button className="projbadge" onClick={() => setTab('prosjekter')} title="Prosjekter – bytt, gi nytt navn, lag nytt">
+      {cover ? <img className="logo img" src={cover} alt="" /> : <span className="logo">{p.icon || '🪁'}</span>}
+      <span className="pb-txt">
+        <span className="title" id="proj-name-header">{p.name}</span>
+        <span className="sub">{[p.origin && p.destination ? `${p.origin} → ${p.destination}` : '', p.description].filter(Boolean).join(' · ') || 'Snowkite-ekspedisjon'} <span className="pb-switch">▾ prosjekter</span></span>
+      </span>
+    </button>
   );
 }
 
@@ -63,7 +86,8 @@ export default function App() {
   const selBar = useStore((s) => s.selectedBarrier);
   const selCamp = useStore((s) => s.selectedCamp);
   const setTab = useStore((s) => s.setTab);
-  const [side, setSide] = useState(true);
+  const [side, setSide] = useState(() => window.innerWidth > 700);
+  const [tech, setTech] = useState(false);
   const main = mainOf(tab);
   const section = SECTIONS.find((x) => x.id === main)!;
   const isMap = tab === 'kart' || tab === 'oversikt';
@@ -83,11 +107,7 @@ export default function App() {
       </svg>
       <header className="top">
         <div className="brand">
-          <span className="logo">🪁</span>
-          <div>
-            <div className="title">Finse → Rjukan</div>
-            <div className="sub">Snowkite-ekspedisjon · mars/april 2027 · planleggingsverktøy</div>
-          </div>
+          <ProjectBadge />
           <SaveIndicator />
         </div>
         <nav className="mainnav" aria-label="Hovedmeny">
@@ -127,25 +147,29 @@ export default function App() {
           </div>
         </div>
         {isMap && (
-          <details className="below techdetails">
+          <details className="below techdetails" onToggle={(e) => setTech((e.target as HTMLDetailsElement).open)}>
             <summary>Tekniske detaljer: delmål og sammenligning av ruter</summary>
-            <SubgoalTable />
-            <CompareTable />
+            {tech && <Suspense fallback={<p className="small muted">Laster …</p>}><TechDetails /></Suspense>}
           </details>
         )}
-        {tab === 'plan' && <PlannerPage />}
-        {tab === 'vaerkite' && <WeatherKitePage />}
-        {tab === 'vind' && <WindPage />}
-        {tab === 'kite' && <KitePage />}
-        {tab === 'sikkerhet' && <SafetyPage />}
-        {tab === 'dagplan' && <DayPlanPage />}
-        {tab === 'simulator' && <SimulatorPage />}
-        {tab === 'modell' && <ModelPage />}
-        {tab === 'overstyring' && <OverridesPage />}
-        {tab === 'utstyr' && <GearPage />}
-        {tab === 'tidslinje' && <TimelinePage />}
-        {tab === 'lagring' && <StoragePage />}
-        {tab === 'kilder' && <SourcesPage />}
+        <Suspense fallback={<div className="page"><p className="muted">Laster …</p></div>}>
+          {tab === 'plan' && <PlannerPage />}
+          {tab === 'scenarier' && <ScenariosPage />}
+          {tab === 'prosjekter' && <ProjectsPage />}
+          {tab === 'eksport' && <ExportPage />}
+          {tab === 'vaerkite' && <WeatherKitePage />}
+          {tab === 'vind' && <WindPage />}
+          {tab === 'kite' && <KitePage />}
+          {tab === 'sikkerhet' && <SafetyPage />}
+          {tab === 'dagplan' && <DayPlanPage />}
+          {tab === 'simulator' && <SimulatorPage />}
+          {tab === 'modell' && <ModelPage />}
+          {tab === 'overstyring' && <OverridesPage />}
+          {tab === 'utstyr' && <GearPage />}
+          {tab === 'tidslinje' && <TimelinePage />}
+          {tab === 'lagring' && <StoragePage />}
+          {tab === 'kilder' && <SourcesPage />}
+        </Suspense>
       </main>
       <footer className="foot small muted">
         Kart © Kartverket (CC BY 4.0) · Hydrologi © NVE · Vær © MET Norge · Skredvarsel © NVE/Varsom. Data hentes direkte fra kildene i nettleseren.

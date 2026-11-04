@@ -19,7 +19,8 @@ export const SLICES: Record<string, (keyof State)[]> = {
   lists: ['checklist', 'timeline', 'packing', 'food'],
   ui: ['tab', 'layers', 'wms', 'frostClientId'],
   history: ['history'],
-  plan: ['plans', 'activePlanId', 'compareIds'],
+  plan: ['plans', 'activePlanId', 'compareIds', 'mainPlanId'],
+  project: ['project', 'exportPrefs'],
 };
 
 /** Data som kan hentes på nytt fra Kartverket/NVE/MET – lagres separat og kan ryddes uten tap. */
