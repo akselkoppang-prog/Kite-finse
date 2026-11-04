@@ -17,8 +17,10 @@ import type { TerrainAnalysis } from '../lib/analysis/terrain';
 import type { Snow, Terrain, Goal } from '../lib/analysis/kite';
 import { uid } from '../lib/geo';
 import { DEFAULT_PROJECT, DEFAULT_EXPORT, type ProjectMeta, type ExportPrefs } from '../lib/project/meta';
+import { gearFromPacking, DEFAULT_FOODS, DEFAULT_MEALS, type Crossing, type GearList, type FoodItem, type MealTemplate, type TeamMember, type Task, type Expense, type DocLink } from '../lib/project/model';
+import type { RouteWeather, WeatherAlert } from '../lib/weather/types';
 
-export type Tab = 'kart' | 'simulator' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder' | 'modell' | 'lagring' | 'oversikt' | 'plan' | 'vaerkite' | 'prosjekt' | 'prosjekter' | 'eksport' | 'scenarier';
+export type Tab = 'kart' | 'simulator' | 'vind' | 'kite' | 'sikkerhet' | 'dagplan' | 'overstyring' | 'utstyr' | 'tidslinje' | 'kilder' | 'modell' | 'lagring' | 'oversikt' | 'plan' | 'vaerkite' | 'prosjekt' | 'prosjekter' | 'eksport' | 'scenarier' | 'vaer' | 'netter' | 'mat' | 'status' | 'oppgaver';
 
 export interface SimUI {
   startDay: number;
@@ -128,6 +130,18 @@ export interface State {
   mainPlanId: string;
   project: ProjectMeta;
   exportPrefs: ExportPrefs;
+  crossings: Crossing[];
+  gearLists: GearList[];
+  foods: FoodItem[];
+  meals: MealTemplate[];
+  team: TeamMember[];
+  tasks: Task[];
+  expenses: Expense[];
+  documents: DocLink[];
+  budget: number;
+  /** værdata langs ruten per leverandør (cache – kan hentes på nytt) */
+  weather: Record<string, RouteWeather>;
+  weatherAlerts: { fetchedAt: string; alerts: WeatherAlert[]; error?: string } | null;
 
   set: (p: Partial<State>) => void;
   setTab: (t: Tab) => void;
@@ -248,6 +262,17 @@ export const useStore = create<State>()(
       mainPlanId: 'plan-main',
       project: DEFAULT_PROJECT,
       exportPrefs: DEFAULT_EXPORT,
+      crossings: [],
+      gearLists: [{ id: 'gear-main', name: 'Hovedliste', items: gearFromPacking(DEFAULT_PACKING) }],
+      foods: DEFAULT_FOODS,
+      meals: DEFAULT_MEALS,
+      team: [],
+      tasks: [],
+      expenses: [],
+      documents: [],
+      budget: 0,
+      weather: {},
+      weatherAlerts: null,
 
       set: (p) => set(p),
       setTab: (tab) => set({ tab }),

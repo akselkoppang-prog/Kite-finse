@@ -16,6 +16,10 @@ export interface ForecastRow {
   symbol?: string;
   fog?: number;
   pressure?: number;
+  /** sikt (m) – fra modeller som har det (Open-Meteo) */
+  visibility?: number;
+  /** snøfall (cm/t) */
+  snow?: number;
 }
 
 export interface Forecast {

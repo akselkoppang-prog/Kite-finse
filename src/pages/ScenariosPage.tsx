@@ -25,7 +25,7 @@ export default function ScenariosPage() {
   const allRuns = usePlanRuns(plans.map((p) => p.id));
   const cmpIds = plans.filter((p) => p.id === activeId || compareIds.includes(p.id)).map((p) => p.id);
   const cmpRuns = allRuns.filter((r) => cmpIds.includes(r.plan.id));
-  const rows = compareRows(cmpRuns, camps, dest);
+  const rows = compareRows(cmpRuns, camps, dest, useStore.getState());
   const toggle = (id: string, on: boolean) => set({ compareIds: on ? [...new Set([...compareIds, id])] : compareIds.filter((x) => x !== id) });
 
   return (
@@ -43,6 +43,11 @@ export default function ScenariosPage() {
                   <span className="scen-badges">{p.id === mainId && <span className="pill main">★ Hovedplan</span>}{p.id === activeId && <span className="pill edit">✎ Redigeres</span>}</span>
                   <input className="scen-name" defaultValue={p.name} key={p.name} aria-label="Navn på scenario" onBlur={(e) => e.target.value.trim() && e.target.value !== p.name && renamePlan(p.id, e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
                 </header>
+                <label className="small row">Avreise <input type="date" className="scen-date" value={p.tripDate ?? ''} aria-label={`Avreise ${p.name}`} onChange={(e) => {
+                  if (!e.target.value) return;
+                  if (p.id === activeId) set({ tripDate: e.target.value });
+                  else set({ plans: useStore.getState().plans.map((x) => (x.id === p.id ? { ...x, tripDate: e.target.value, updatedAt: new Date().toISOString() } : x)) });
+                }} /></label>
                 <div className="scen-sum small">
                   <b>{sm.doneDay ? `${dest || 'Mål'} dag ${sm.doneDay.day} kl. ${hhmm(sm.doneDay.arrival)}` : `${sm.remainingKm.toFixed(0)} km igjen etter dag ${sm.days}`}</b>
                   <span className="muted"> · {sm.days} dager · {sm.totalKm.toFixed(0)} km · rute: {r.route?.name ?? '–'}</span>

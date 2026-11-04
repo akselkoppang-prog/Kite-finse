@@ -6,6 +6,8 @@ import { KITES } from '../../data/kites';
 import { runPlan } from '../plan/context';
 import { kiteName, compareRows } from '../plan/compare';
 import { STATUS_TEXT } from '../project/meta';
+import { gearListOf } from '../plan/context';
+import { assumedKg } from '../project/model';
 import type { ExportSnapshot } from './snapshot';
 import type { Sheet, Cell } from './table';
 
@@ -164,12 +166,39 @@ export function compareSheet(snap: ExportSnapshot, ids: string[]): Sheet {
   return compareFromRuns(runs, snap);
 }
 function compareFromRuns(runs: ReturnType<typeof runPlan>[], snap: ExportSnapshot): Sheet {
-  const rows = compareRows(runs, snap.st.camps, snap.st.project.destination);
+  const rows = compareRows(runs, snap.st.camps, snap.st.project.destination, snap.st);
   return { name: 'Sammenligning', header: ['', ...runs.map((r) => r.plan.name)], rows: rows.map((r) => [r.label, ...r.values]), widths: [22, ...runs.map(() => 45)] };
 }
 
+export function nightsSheet(snap: ExportSnapshot): Sheet {
+  const rows = snap.insights.nights.map((n) => [n.night, fmtDate(n.date), n.camp?.name ?? 'ikke valgt', n.camp?.kind ?? '', n.camp?.capacity ?? null, +n.distFromPrevKm.toFixed(2), hhmm(n.arrival), n.camp?.resupply ? 'ja' : '', n.camp?.costPerPerson ?? null, n.issues.join(' | ')] as Cell[]);
+  return { name: 'Netter', header: ['Natt', 'Dato', 'Sted', 'Type', 'Plasser', 'Dagsetappe km', 'Ankomst', 'Påfyll', 'kr/person', 'Merknader'], rows, formats: ['int', null, null, null, 'int', 'km', null, null, 'int', null] };
+}
+
+export function gearSheet(snap: ExportSnapshot): Sheet {
+  const list = gearListOf(snap.st, snap.run.plan);
+  const owner = (id?: string) => (id && id !== 'felles' ? snap.st.team.find((m) => m.id === id)?.name ?? '' : 'felles');
+  const rows = (list?.items ?? []).map((g) => [g.cat, g.name, g.qty, g.kg ?? null, assumedKg(g) ?? null, (assumedKg(g) ?? 0) * g.qty, g.carry, owner(g.owner), g.packed ? 'ja' : 'nei', g.ratingC ?? null, g.capacity ?? null] as Cell[]);
+  return { name: 'Utstyr', header: ['Kategori', 'Utstyr', 'Antall', 'Vekt kg (din)', 'Vekt kg (brukt)', 'Sum kg', 'Bæres', 'Eier', 'Pakket', 'Komfort °C', 'Personer'], rows, formats: [null, null, 'int', 'dec1', 'dec1', 'dec1', null, null, null, 'int', 'int'] };
+}
+
+export function foodSheet(snap: ExportSnapshot): Sheet {
+  const f = snap.insights.food;
+  const rows = f.perDay.map((n, i) => [i < f.days ? `Dag ${i + 1}` : `Reserve ${i - f.days + 1}`, Math.round(n.kcal), Math.round(f.target), Math.round(n.protein), Math.round(n.fat), Math.round(n.carbs), Math.round(n.g), i < f.days ? +(f.remainingKgByDay[i] ?? 0).toFixed(2) : null] as Cell[]);
+  return { name: 'Mat', header: ['Dag', 'kcal/person', 'Behov kcal', 'Protein g', 'Fett g', 'Karbo g', 'Vekt g/person', 'Mat igjen kg (gruppen)'], rows, formats: [null, 'int', 'int', 'int', 'int', 'int', 'int', 'dec1'] };
+}
+
+export function shoppingSheet(snap: ExportSnapshot): Sheet {
+  return { name: 'Handleliste', header: ['Vare', 'Gram', 'Pakninger', 'g per pakning'], rows: snap.insights.food.shopping.map((x) => [x.food.name, Math.round(x.g), x.packs, x.food.packG ?? null]), formats: [null, 'int', 'int', 'int'] };
+}
+
+export function tasksSheet(snap: ExportSnapshot): Sheet {
+  const st = snap.st;
+  return { name: 'Oppgaver', header: ['Oppgave', 'Ferdig', 'Frist', 'Ansvarlig', 'Prioritet', 'Milepæl', 'Scenario'], rows: st.tasks.map((t) => [t.title, t.done ? 'ja' : 'nei', t.due ?? '', st.team.find((m) => m.id === t.assignee)?.name ?? '', t.priority ?? '', t.milestone ? 'ja' : '', st.plans.find((p) => p.id === t.scenarioId)?.name ?? '']) };
+}
+
 export function workbook(snap: ExportSnapshot, compareIds: string[] = []): Sheet[] {
-  const sh = [overviewSheet(snap), itinerarySheet(snap), checkpointSheet(snap), waypointSheet(snap, true), campSheet(snap), windSheet(snap), kiteSheet(snap), assumptionSheet(snap)];
+  const sh = [overviewSheet(snap), itinerarySheet(snap), nightsSheet(snap), checkpointSheet(snap), waypointSheet(snap, true), campSheet(snap), windSheet(snap), kiteSheet(snap), gearSheet(snap), foodSheet(snap), shoppingSheet(snap), tasksSheet(snap), assumptionSheet(snap)];
   if (compareIds.length > 1) sh.push(compareSheet(snap, compareIds));
   return sh;
 }

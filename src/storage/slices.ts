@@ -20,11 +20,15 @@ export const SLICES: Record<string, (keyof State)[]> = {
   ui: ['tab', 'layers', 'wms', 'frostClientId'],
   history: ['history'],
   plan: ['plans', 'activePlanId', 'compareIds', 'mainPlanId'],
-  project: ['project', 'exportPrefs'],
+  project: ['project', 'exportPrefs', 'documents', 'budget'],
+  crossings: ['crossings'],
+  gear: ['gearLists'],
+  food: ['foods', 'meals'],
+  team: ['team', 'tasks', 'expenses'],
 };
 
 /** Data som kan hentes på nytt fra Kartverket/NVE/MET – lagres separat og kan ryddes uten tap. */
-export const CACHE_KEYS = ['hydro', 'lakes', 'terrain', 'routeForecast'] as const;
+export const CACHE_KEYS = ['hydro', 'lakes', 'terrain', 'routeForecast', 'weather', 'weatherAlerts'] as const;
 export type CacheKey = (typeof CACHE_KEYS)[number];
 
 /** Kortvarig UI-tilstand som ikke lagres. */

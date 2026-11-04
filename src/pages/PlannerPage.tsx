@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useStore } from '../state/store';
-import { useExpedition, setDayCount, savePlanAs } from '../state/expedition';
+import { useExpedition, setDayCount, savePlanAs, updatePlan } from '../state/expedition';
 import { hhmm, type DayOutcome } from '../lib/sim/expedition';
 import { addDays, daysBetween } from '../lib/sun';
-import { forecast } from '../lib/api/met';
-import { cumulative, pointAt } from '../lib/geo';
+import { refreshWeather } from '../lib/weather/actions';
 import DayCard from '../components/plan/DayCard';
 import { kiteShort } from '../components/plan/KiteChips';
 import { uid } from '../lib/geo';
@@ -20,33 +19,29 @@ import { TripStrip } from '../components/plan/TripStrip';
 
 export default function PlannerPage() {
   const s = useStore();
-  const { plan, ctx, days } = useExpedition();
+  const { plan, ctx, days, route } = useExpedition();
   const [fcBusy, setFcBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const today = new Date().toISOString().slice(0, 10);
   const lastDate = addDays(s.tripDate, plan.days.length - 1);
   const inHorizon = daysBetween(today, lastDate) <= 9 && daysBetween(today, s.tripDate) >= -1;
-  const forecastAvailable = inHorizon && !!s.routeForecast?.points.length;
+  const forecastAvailable = inHorizon && !!ctx?.forecast?.length;
   const sm = summary(days);
   const total = ctx?.total ?? 0;
 
   const fetchForecast = async () => {
-    if (!ctx) return;
+    if (!route) return;
     setFcBusy(true);
-    const cum = cumulative(ctx.route);
-    const n = Math.max(2, Math.round(ctx.total / 15000) + 1);
-    const pts = [];
-    for (let i = 0; i < n; i++) {
-      const d = (ctx.total * i) / (n - 1);
-      const p = pointAt(ctx.route, cum, d);
-      try {
-        pts.push({ ...p, d, label: `${(d / 1000).toFixed(0)} km`, fc: await forecast({ ...p, label: `${(d / 1000).toFixed(0)} km` }) });
-      } catch (e) {
-        setMsg(`Værmelding feilet: ${(e as Error).message}`);
+    try {
+      const errs = await refreshWeather(route, [plan.weatherSource ?? 'met']);
+      if (errs.length) setMsg(`Værmelding: ${errs.join('; ')}`);
+      else {
+        updatePlan((p) => ({ ...p, days: p.days.map((d) => ({ ...d, windMode: 'prognose' })) }));
+        setMsg('Værmelding hentet – dagene bruker nå prognosen. Se Vær & kite → Vær langs ruten for detaljer.');
       }
+    } finally {
+      setFcBusy(false);
     }
-    if (pts.length) s.set({ routeForecast: { points: pts, fetchedAt: new Date().toISOString() } });
-    setFcBusy(false);
   };
 
   const makeVariants = () => {
@@ -61,7 +56,7 @@ export default function PlannerPage() {
     <div className="planner">
       <section className="plan-top">
         <div className="pt-row">
-          <label className="pt-field">Avreisedato
+          <label className="pt-field">Avreise (dette scenarioet)
             <input id="plan-date" type="date" value={s.tripDate} onChange={(e) => e.target.value && s.set({ tripDate: e.target.value })} />
           </label>
           <div className="pt-field">Antall dager
@@ -91,7 +86,7 @@ export default function PlannerPage() {
         <TripStrip days={days} total={total} />
         <div className="small muted">
           {inHorizon ? (
-            <>Datoen er innenfor værmeldingen. <button className="btn small" onClick={fetchForecast} disabled={fcBusy}>{fcBusy ? 'Henter …' : s.routeForecast ? 'Oppdater værmelding' : 'Hent værmelding langs ruten'}</button></>
+            <>Datoen er innenfor værmeldingen. <button className="btn small" onClick={fetchForecast} disabled={fcBusy}>{fcBusy ? 'Henter …' : ctx?.forecast?.length ? 'Oppdater værmelding' : 'Hent værmelding langs ruten'}</button></>
           ) : (
             <>Ingen værmelding for {s.tripDate} ennå (MET gir ~9 døgn frem, fra ca. {addDays(s.tripDate, -9)}). Vinden under er ditt eget scenario.</>
           )}

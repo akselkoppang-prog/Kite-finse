@@ -102,6 +102,16 @@ export interface Camp extends LatLon {
   note?: string;
   approved?: boolean;
   role?: 'foretrukket' | 'reserve';
+  /** telt, hytte, gapahuk/bu, leirplass … */
+  kind?: 'telt' | 'hytte' | 'gapahuk' | 'leirplass' | 'annet';
+  /** sengeplasser / plass til antall personer (hytte, bu) */
+  capacity?: number;
+  /** bare tilgjengelig i disse scenarioene (tom = alle) */
+  scenarioIds?: string[];
+  /** her kan dere fylle på mat/brensel */
+  resupply?: boolean;
+  /** pris per person per natt (kr) */
+  costPerPerson?: number;
   description?: string;
   assessment?: string;
   notes?: string;

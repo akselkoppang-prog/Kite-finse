@@ -4,7 +4,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useProfile } from './derived';
 import { runExpedition, newDay, type DayPlan, type PlanScenario } from '../lib/sim/expedition';
 import { buildPlanContext, routeOf, runPlan, type PlanRun } from '../lib/plan/context';
-import { uid } from '../lib/geo';
+import { uid, nearestOnRoute } from '../lib/geo';
+import { scenarioInsights } from '../lib/plan/insights';
 
 export function useActivePlan(): PlanScenario {
   const plans = useStore((s) => s.plans);
@@ -14,7 +15,7 @@ export function useActivePlan(): PlanScenario {
 
 /** Felt i tilstanden som påvirker beregningen (alt annet ignoreres → færre omberegninger). */
 function useCalcInputs() {
-  return useStore(useShallow((s) => [s.routes, s.activeRouteId, s.terrain, s.quivers, s.activeQuiverId, s.simParams, s.riderKg, s.pulkKg, s.snow, s.tripDate, s.routeForecast, s.travel, s.kiteModelEdits, s.calibTracks, s.kiteOverrides] as const));
+  return useStore(useShallow((s) => [s.routes, s.activeRouteId, s.terrain, s.quivers, s.activeQuiverId, s.simParams, s.riderKg, s.pulkKg, s.snow, s.tripDate, s.routeForecast, s.travel, s.kiteModelEdits, s.calibTracks, s.kiteOverrides, s.weather, s.crossings, s.gearLists, s.foods, s.meals, s.team, s.camps] as const));
 }
 
 function useExpeditionCompute() {
@@ -23,7 +24,7 @@ function useExpeditionCompute() {
   const route = useStore((s) => routeOf(s, plan));
   // laster DTM-høyder for ruten; når de kommer, regnes planen ut på nytt
   const { profile } = useProfile(route);
-  const ctx = useMemo(() => (route ? buildPlanContext(useStore.getState(), route) : null), [route, profile, ...inputs]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ctx = useMemo(() => (route ? buildPlanContext(useStore.getState(), route, plan) : null), [route, profile, plan, ...inputs]); // eslint-disable-line react-hooks/exhaustive-deps
   const days = useMemo(() => (ctx && plan ? runExpedition(plan, ctx) : []), [plan, ctx]);
   return { plan, ctx, days, route };
 }
@@ -35,6 +36,20 @@ const ExpCtx = createContext<Exp | null>(null);
 function useScenarioRouteSync() {
   const activePlanId = useStore((s) => s.activePlanId);
   const activeRouteId = useStore((s) => s.activeRouteId);
+  const tripDate = useStore((s) => s.tripDate);
+  // Hvert scenario har egen avreisedato. «tripDate» i appen = datoen til scenarioet som er åpent.
+  useEffect(() => {
+    const st = useStore.getState();
+    if (st.plans.some((p) => !p.tripDate)) st.set({ plans: st.plans.map((p) => (p.tripDate ? p : { ...p, tripDate: st.tripDate })) });
+    const p = useStore.getState().plans.find((x) => x.id === activePlanId);
+    if (p?.tripDate && p.tripDate !== useStore.getState().tripDate) useStore.getState().set({ tripDate: p.tripDate });
+  }, [activePlanId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const st = useStore.getState();
+    const p = st.plans.find((x) => x.id === st.activePlanId);
+    // les gjeldende verdi (ikke den fra forrige visning) så scenariobytte aldri overskriver datoen
+    if (p && p.tripDate && p.tripDate !== st.tripDate) st.set({ plans: st.plans.map((x) => (x.id === p.id ? { ...x, tripDate: st.tripDate } : x)) });
+  }, [tripDate]);
   useEffect(() => {
     const st = useStore.getState();
     const p = st.plans.find((x) => x.id === activePlanId);
@@ -189,4 +204,27 @@ export function importScenario(json: string): string {
   st.set({ routes, camps, plans: [...st.plans, plan] });
   st.log('annet', `Importerte scenario «${plan.name}»`);
   return id;
+}
+
+/** Samlet innsikt for aktivt scenario (netter, vær, utstyr, mat, last) – én beregning for alle sider. */
+export function useInsights() {
+  const { plan, days, route } = useExpedition();
+  const deps = useStore(useShallow((s) => [s.camps, s.team, s.gearLists, s.foods, s.meals, s.weather, s.crossings, s.terrain, s.hydro, s.lakes, s.quivers, s.activeQuiverId, s.simParams.tempC] as const));
+  return useMemo(() => scenarioInsights(useStore.getState(), plan, days, route), [plan, days, route, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/** Velg overnatting etter dag i (null = fjern). Dagens stopp settes til stedet; andre scenarioer røres ikke. */
+export function assignCamp(i: number, campId: string | null) {
+  const st = useStore.getState();
+  const plan = st.plans.find((p) => p.id === st.activePlanId) ?? st.plans[0];
+  const route = routeOf(st, plan);
+  if (!campId) {
+    updateDay(i, { campId: undefined, target: { mode: 'auto' } });
+    return;
+  }
+  const c = st.camps.find((x) => x.id === campId);
+  if (!c || !route) return;
+  const d = nearestOnRoute(route.waypoints, c).d;
+  st.set({ camps: st.camps.map((x) => (x.id === campId ? { ...x, night: i + 1, role: 'foretrukket' } : x)) });
+  updateDay(i, { campId, target: { mode: 'stopp', stopD: d } });
 }

@@ -5,7 +5,7 @@ import { evaluateCamp } from '../lib/analysis/camps';
 import { dirName, fmtCoord, fmtDM, nearestOnRoute, uid } from '../lib/geo';
 import { cachedElevation } from '../lib/api/kartverket';
 import { Badge } from './ui';
-import { useExpedition, updateDay } from '../state/expedition';
+import { useExpedition, updateDay, assignCamp } from '../state/expedition';
 import { hhmm } from '../lib/sim/expedition';
 import { AttachmentImg } from './SaveStatus';
 import { putImage } from '../storage/blobs';
@@ -38,6 +38,12 @@ export default function CampPanel({ id }: { id: string }) {
       </header>
       <div className="form1">
         <label>Navn<input id="camp-name" value={c.name} onChange={(e) => upd({ name: e.target.value })} /></label>
+        <div className="row">
+          <label>Type<select id="camp-kind" value={c.kind ?? 'telt'} onChange={(e) => upd({ kind: e.target.value as Camp['kind'] })}><option value="telt">⛺ Telt</option><option value="hytte">🏠 Hytte</option><option value="gapahuk">🛖 Gapahuk/bu</option><option value="leirplass">🏕️ Leirplass</option><option value="annet">Annet</option></select></label>
+          <label>Plasser<input id="camp-cap" type="number" min={0} value={c.capacity ?? ''} onChange={(e) => upd({ capacity: e.target.value === '' ? undefined : +e.target.value })} style={{ width: 70 }} /></label>
+          <label className="chk"><input type="checkbox" checked={!!c.resupply} onChange={(e) => upd({ resupply: e.target.checked })} /> påfyll mat/brensel</label>
+        </div>
+        <label className="chk"><input id="camp-only" type="checkbox" checked={!!c.scenarioIds?.length} onChange={(e) => upd({ scenarioIds: e.target.checked ? [s.activePlanId] : undefined })} /> Bare i scenarioet «{s.plans.find((p) => p.id === s.activePlanId)?.name}»{c.scenarioIds && c.scenarioIds.length > 1 ? ` (+${c.scenarioIds.length - 1} til)` : ''}</label>
         <label>Beskrivelse<textarea id="camp-desc" rows={2} value={c.description ?? ''} placeholder="F.eks. le bak morenerygg, god snø til smelting" onChange={(e) => upd({ description: e.target.value })} /></label>
         {(() => {
           const di = exp.plan.days.findIndex((d) => d.campId === c.id);
@@ -47,11 +53,8 @@ export default function CampPanel({ id }: { id: string }) {
               {out ? <>⛺ Overnatting etter <b>dag {di + 1}</b> · forventet ankomst <b>{hhmm(out.arrival)}</b> ({out.forcedStop ? 'ditt valg – lenger enn modellen rekker' : 'etter planen'})</> : <span className="muted">Ikke valgt som overnatting i dagplanen.</span>}
               <div className="row">
                 <select id="camp-useday" value="" onChange={(e) => {
-                  const i = +e.target.value;
-                  if (!route) return;
-                  const d = nearestOnRoute(route.waypoints, c).d;
-                  s.set({ camps: s.camps.map((x) => (x.id === id ? { ...x, night: i + 1, role: 'foretrukket' } : x.night === i + 1 && x.role === 'foretrukket' ? { ...x, role: 'reserve' } : x)) });
-                  updateDay(i, { campId: id, target: { mode: 'stopp', stopD: d } });
+                  if (!route || e.target.value === '') return;
+                  assignCamp(+e.target.value, id);
                 }}>
                   <option value="">Bruk som overnatting etter dag …</option>
                   {exp.plan.days.slice(0, -1).map((_, i) => <option key={i} value={i}>Dag {i + 1}</option>)}

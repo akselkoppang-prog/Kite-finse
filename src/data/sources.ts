@@ -14,6 +14,8 @@ export type SourceId =
   | 'nve-skred-wms'
   | 'met-forecast'
   | 'met-frost'
+  | 'met-alerts'
+  | 'open-meteo'
   | 'varsom'
   | 'bruker-gpx'
   | 'kunnskap-regulering';
@@ -158,6 +160,28 @@ export const SOURCES: Record<SourceId, SourceDef> = {
     license: 'CC BY 4.0 / NLOD – © MET Norge',
     researchNote: 'Krever gratis klient-ID (registrer på frost.met.no). Legg den inn under Vær & vind. Lagres kun lokalt i nettleseren/prosjektfilen.',
     needsKey: true,
+  },
+  'met-alerts': {
+    id: 'met-alerts',
+    name: 'MetAlerts 2.0 (farevarsler)',
+    provider: 'MET Norge',
+    kind: 'REST-API',
+    urls: ['https://api.met.no/weatherapi/metalerts/2.0/current.json'],
+    usedFor: 'Gjeldende farevarsler (vind, kuling, snøfokk, polare lavtrykk …) for punkter langs ruten.',
+    license: 'CC BY 4.0 / NLOD – © MET Norge',
+    researchNote: 'Offentlig, ingen nøkkel. Svarer med GeoJSON (CAP-baserte varsler). Tom liste = ingen gjeldende varsler.',
+    needsKey: false,
+  },
+  'open-meteo': {
+    id: 'open-meteo',
+    name: 'Open-Meteo Forecast API (ECMWF, ICON, MET Nordic m.fl.)',
+    provider: 'Open-Meteo (data fra nasjonale værtjenester)',
+    kind: 'REST-API',
+    urls: ['https://api.open-meteo.com/v1/forecast'],
+    usedFor: 'Prognoser fra flere modeller (ECMWF IFS, DWD ICON, MET Nordic) til sammenligning med Yr/MET. Inntil 16 døgn frem. Inkluderer sikt og snøfall.',
+    license: 'CC BY 4.0 – Open-Meteo.com (ikke-kommersiell bruk gratis, uten nøkkel)',
+    researchNote: 'Ingen nøkkel, CORS åpen. Modelldata – ikke observasjoner. Fair use: < 10 000 kall per dag.',
+    needsKey: false,
   },
   varsom: {
     id: 'varsom',

@@ -7,6 +7,8 @@ import { majorChange } from './hooks';
 import { migrateFromLocalStorage, type MigrationReport } from './migrate';
 import { elevSnapshot, elevDirty, loadElevCache, markElevSaved } from '../lib/api/kartverket';
 import type { Route } from '../types';
+import { gearFromPacking, DEFAULT_TASKS } from '../lib/project/model';
+import type { PackItem } from '../data/packing';
 
 export type SaveState = 'loading' | 'saved' | 'saving' | 'unsaved' | 'warning' | 'failed' | 'unavailable';
 
@@ -282,6 +284,11 @@ export async function hydrate(projectId: string) {
     const rec = await db.get('projects', projectId);
     next.project = { ...(INITIAL.project as object), name: rec?.name ?? (INITIAL.project as { name: string }).name };
   } else next.project = { ...(INITIAL.project as object), ...(next.project as object) };
+  // eldre prosjekter: pakkelisten blir scenarioenes utstyrsliste (vekter og «pakket» beholdes)
+  const migratedGear = !slices.some((x) => x.slice === 'gear') && Array.isArray(next.packing);
+  if (migratedGear) next.gearLists = [{ id: 'gear-main', name: 'Hovedliste', items: gearFromPacking(next.packing as PackItem[]) }];
+  const seededTasks = !slices.some((x) => x.slice === 'team') && typeof next.tripDate === 'string';
+  if (seededTasks) next.tasks = DEFAULT_TASKS(next.tripDate as string);
   if (!next.mainPlanId || !(next.plans as { id: string }[]).some((p) => p.id === next.mainPlanId)) next.mainPlanId = (next.plans as { id: string }[])[0]?.id;
   if (!(next.plans as { id: string }[]).some((p) => p.id === next.activePlanId)) next.activePlanId = next.mainPlanId;
   if (elev?.value) loadElevCache(elev.value as Record<string, never>);
@@ -301,6 +308,9 @@ export async function hydrate(projectId: string) {
   hydrating = false;
   // prosjekter uten «project»-felt: skriv det straks (vanlig autolagring)
   if (!hasMeta) lastRefs.set('project', undefined);
+  // flyttet pakkeliste / startoppgaver lagres med en gang (ikke bare når de endres)
+  if (migratedGear) lastRefs.set('gearLists', undefined);
+  if (seededTasks) lastRefs.set('tasks', undefined);
   if (isDirty()) schedule();
 }
 

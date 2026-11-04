@@ -32,14 +32,19 @@ const StoragePage = lazy(() => import('./pages/StoragePage'));
 const ScenariosPage = lazy(() => import('./pages/ScenariosPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const ExportPage = lazy(() => import('./pages/ExportPage'));
+const VaerPage = lazy(() => import('./pages/VaerPage'));
+const NightsPage = lazy(() => import('./pages/NightsPage'));
+const FoodPage = lazy(() => import('./pages/FoodPage'));
+const StatusPage = lazy(() => import('./pages/StatusPage'));
+const TasksPage = lazy(() => import('./pages/TasksPage'));
 const TechDetails = lazy(() => import('./components/TechDetails'));
 
 type Main = 'oversikt' | 'plan' | 'vaerkite' | 'utstyr' | 'eksport' | 'innstillinger';
 const SECTIONS: { id: Main; label: string; short?: string; icon: string; subs: [Tab, string][] }[] = [
-  { id: 'oversikt', label: 'Oversikt', icon: '🗺️', subs: [['oversikt', 'Kart og rute'], ['prosjekter', 'Prosjekt']] },
-  { id: 'plan', label: 'Dagplan', icon: '📅', subs: [['plan', 'Dagene'], ['scenarier', 'Scenarioer'], ['tidslinje', 'Kalender og sol'], ['dagplan', 'Avansert dagsfordeling']] },
-  { id: 'vaerkite', label: 'Vær & kite', icon: '🪁', subs: [['vaerkite', 'Kite og vind'], ['vind', 'Værmelding'], ['simulator', 'Simulator'], ['kite', 'Kitedatabase']] },
-  { id: 'utstyr', label: 'Utstyr & planlegging', short: 'Utstyr', icon: '🎒', subs: [['utstyr', 'Utstyr og mat'], ['sikkerhet', 'Sikkerhet'], ['overstyring', 'Vann-godkjenninger']] },
+  { id: 'oversikt', label: 'Oversikt', icon: '🗺️', subs: [['oversikt', 'Kart og rute'], ['status', 'Status'], ['oppgaver', 'Oppgaver og team'], ['prosjekter', 'Prosjekt']] },
+  { id: 'plan', label: 'Dagplan', icon: '📅', subs: [['plan', 'Dagene'], ['netter', 'Overnatting'], ['scenarier', 'Scenarioer'], ['tidslinje', 'Kalender og sol'], ['dagplan', 'Avansert dagsfordeling']] },
+  { id: 'vaerkite', label: 'Vær & kite', icon: '🪁', subs: [['vaer', 'Vær langs ruten'], ['vaerkite', 'Kite og vind'], ['vind', 'Værmelding'], ['simulator', 'Simulator'], ['kite', 'Kitedatabase']] },
+  { id: 'utstyr', label: 'Utstyr & planlegging', short: 'Utstyr', icon: '🎒', subs: [['utstyr', 'Utstyr'], ['mat', 'Mat og vann'], ['sikkerhet', 'Sikkerhet'], ['overstyring', 'Vann-godkjenninger']] },
   { id: 'eksport', label: 'Eksport & deling', short: 'Eksport', icon: '📤', subs: [['eksport', 'Eksport & deling']] },
   { id: 'innstillinger', label: 'Innstillinger', short: 'Oppsett', icon: '⚙️', subs: [['lagring', 'Lagring og backup'], ['kilder', 'Datakilder'], ['modell', 'Modell og kalibrering']] },
 ];
@@ -157,6 +162,11 @@ export default function App() {
           {tab === 'scenarier' && <ScenariosPage />}
           {tab === 'prosjekter' && <ProjectsPage />}
           {tab === 'eksport' && <ExportPage />}
+          {tab === 'vaer' && <VaerPage />}
+          {tab === 'netter' && <NightsPage />}
+          {tab === 'mat' && <FoodPage />}
+          {tab === 'status' && <StatusPage />}
+          {tab === 'oppgaver' && <TasksPage />}
           {tab === 'vaerkite' && <WeatherKitePage />}
           {tab === 'vind' && <WindPage />}
           {tab === 'kite' && <KitePage />}

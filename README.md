@@ -21,6 +21,39 @@ Krever Node 18+. Ingen API-nøkler trengs (per nov. 2026).
 **GitHub Pages:** workflowen `.github/workflows/pages.yml` bygger og publiserer ved push til `main`.
 Slå på Pages i repoets innstillinger (Settings → Pages → Source: GitHub Actions).
 
+## Versjon 7 – én sammenhengende ekspedisjonsplan
+
+Hvert **scenario** er nå en fullstendig plan: egen avreisedato, rute, værkilde, vind/kite/tider per dag, overnattinger, utstyrsliste og matplan. Alt regnes ut ett sted (`src/lib/plan/insights.ts`), så kart, dagkort, vær, utstyr, mat, status og eksport viser de samme tallene. Endringer i ett scenario rører aldri et annet.
+
+**Hvordan delene henger sammen**
+
+| Endrer du … | … oppdateres |
+|---|---|
+| avreisedato for scenarioet | vær langs ruten (riktige timer), dagslys, sikkerhet i estimatet, beste-avreise-tabellen |
+| rute | distanser, kryssinger av vann, krysninger (ferje/bro/is …), dagsetapper, netter |
+| overnatting (Dagplan → Overnatting) | dagens stopp og neste dags start, avstander, ankomsttider, kapasitet mot teamet, påfyll av mat |
+| vær / værleverandør | fremdrift (vind, sikt, snøfall), farlige forhold, utstyrsråd (kulde, kast), energibehov |
+| utstyrsvekter | pulkvekt i fremdriftsberegningen (+ «hva betyr 5 kg mer?») |
+| antall dager / team | mat, vann, brensel, telt- og sengeplass |
+
+**Vær langs ruten** (Vær & kite): Yr/MET Locationforecast og Open-Meteo (ECMWF, DWD ICON, MET Nordic) for punkter hver ~12 km. Været vises der og når simuleringen sier dere er på ruten (motvind/medvind, kast, temperatur og følt temperatur, nedbør/snø, sikt, skydekke), med farlige forhold uthevet. Sammenligning av leverandører (inkl. ankomsttid med hver), MET-farevarsler, siste observasjoner (MET Frost, krever gratis klient-ID) og Windy-kart. «Finn beste avreise» prøver de neste 14 dagene med scenarioet. Prognosens oppdateringstid vises alltid; prognose og observasjon er tydelig skilt. Nye leverandører legges til i `src/lib/weather/providers.ts`.
+
+Windy sitt data-API krever betalt nøkkel som ikke kan holdes hemmelig på en statisk nettside (GitHub Pages har ingen server), så appen bruker Windys offisielle innbyggingskart og lenker. Ingen nøkler ligger i koden.
+
+**Mer realistiske tider**: krysninger med ventetid, overgangstid, rutetabell (neste avgang) og sesong – etter siste avgang stopper dagen ved krysningen. Tretthet per dag, pulkvekt fra utstyr + gjenværende mat og brensel, og fartsreduksjon ved dårlig sikt/snøfall kommer i tillegg til den fysiske vind-/terrengmodellen. Hver dag viser beste tilfelle, realistisk og forsiktig ankomst, sikkerhet (høy/middels/lav) med de største usikkerhetene, og «Hvordan er dette regnet ut?» med tidsbruk (kiting, kryss, ski, gåing, pauser, venting, krysninger).
+
+**Overnatting**: telt, hytte, gapahuk/bu og leirplass med plasser, påfyll og pris; kan gjelde alle eller bare enkelte scenarioer. Natt for natt med dagsetappe, ankomst og varsler (for få plasser, ikke valgt, mørkt ved ankomst).
+
+**Utstyr**: lister som kan deles mellom scenarioer eller kopieres, kategorier, antall, vekt (typisk vekt brukes til du legger inn din egen), pulk/kropp, eier (felles/person), pakket. Råd ut fra netter og overnattingstype, kulde, kast, bratt terreng, vann/is og teamstørrelse – mangler, uegnet (f.eks. sovepose) og kanskje unødvendig (telt når alle netter er på hytte).
+
+**Mat og vann**: måltider per dag fra maler, kcal/protein mot behov (aktivitet, kulde, kroppsvekt), vekt, volum, vann, brensel, handleliste, mat igjen underveis og påfyll ved overnattinger.
+
+**Prosjekt**: Status (beredskap per område og «trenger oppmerksomhet»), oppgaver med frist, ansvarlig, prioritet, milepæl og kobling til scenario, dag, overnatting, utstyr, krysning eller rute-km; team; budsjett og utgifter; dokumenter og lenker.
+
+**Eksport**: PDF og Excel får overnatting, utstyrsliste og -råd, matplan og handleliste, oppgaver og farlige forhold i prognosen – alltid for scenarioets egen dato.
+
+Tester: `npm test` (nå også `tests/plan.test.ts`: krysninger, værnormalisering, farer, mat, utstyrsråd, beredskap og dagsimulering) + Playwright `tests/e2e/v7-e2e.cjs` (med stubber for MET, Open-Meteo og MetAlerts).
+
 ## Versjon 6 – prosjekter, scenarioer og eksport
 
 **Prosjekter** (Oversikt → Prosjekt, eller trykk prosjektnavnet øverst)

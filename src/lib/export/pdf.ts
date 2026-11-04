@@ -6,7 +6,9 @@ import { DAY_COLORS, hhmm, type DayOutcome } from '../sim/expedition';
 import { sunDay, hourOf, type SunDay } from '../sun';
 import { KITES } from '../../data/kites';
 import { kiteName, compareRows, SCENARIO_COLORS } from '../plan/compare';
-import { runPlan, type PlanRun } from '../plan/context';
+import { runPlan, gearListOf, forecastFor, type PlanRun } from '../plan/context';
+import { providerById } from '../weather/providers';
+import { assumedKg } from '../project/model';
 import { STATUS_TEXT, PRESETS } from '../project/meta';
 import { LEVEL_TEXT } from '../warnings';
 import { blobUrl } from '../../storage/blobs';
@@ -803,7 +805,8 @@ async function dayPage(b: Brief, d: DayOutcome) {
   b.doc.text(T(`Fra ${dirName(pd.wind.dir)} (${pd.wind.dir}°) · ${n1(pd.wind.avg)} m/s`), b.M + 26, b.y + 10);
   b.font(8.6, 'normal', C.ink);
   b.doc.text(T(`Spenn ${n1(pd.wind.min)}–${n1(pd.wind.max)} m/s · kast ${n1(pd.wind.gust)} m/s`), b.M + 26, b.y + 15);
-  const src = pd.windMode === 'manuell' ? 'EGET SCENARIO - ikke værmelding' : pd.windMode === 'prognose' ? `MET-PROGNOSE${snap.st.routeForecast ? ` (hentet ${new Date(snap.st.routeForecast.fetchedAt).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' })})` : ''}` : 'PROGNOSE + DIN JUSTERING';
+  const wsrc = snap.route ? forecastFor(snap.st, snap.route, snap.run.plan) : null;
+  const src = pd.windMode === 'manuell' ? 'EGET SCENARIO - ikke værmelding' : `${pd.windMode === 'prognose' ? 'PROGNOSE' : 'PROGNOSE + DIN JUSTERING'}: ${providerById(snap.run.plan.weatherSource).short.toUpperCase()}${wsrc?.updatedAt || wsrc?.fetchedAt ? ` (${new Date((wsrc.updatedAt ?? wsrc.fetchedAt)!).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' })})` : ''}`;
   b.font(7.2, 'bold', pd.windMode === 'manuell' ? C.amber : C.green);
   b.doc.text(T(src), b.M + 26, b.y + 20.5);
   // dagslys
@@ -922,28 +925,46 @@ function equipmentPage(b: Brief) {
   const q = st.quivers.find((x) => x.id === st.activeQuiverId);
   const used = new Map<string, number[]>();
   snap.run.days.forEach((d) => !isReserve(d) && used.set(d.kiteId, [...(used.get(d.kiteId) ?? []), d.day]));
+  const ins = snap.insights;
+  const list = gearListOf(st, snap.run.plan);
   b.tiles([
-    { label: 'Kroppsvekt', value: `${st.riderKg} kg` },
-    { label: 'Pulk', value: `${st.pulkKg} kg` },
-    { label: 'Utstyr på kroppen', value: `${st.simParams.extraKg} kg` },
-    { label: 'Total last', value: `${st.riderKg + st.pulkKg + st.simParams.extraKg} kg` },
+    { label: 'I pulkene (utstyr)', value: `${n1(ins.gear.pulkKg)} kg`, sub: ins.people > 1 ? `${n1(ins.gear.pulkKg / ins.people)} kg per pulk` : undefined },
+    { label: 'Pulk dag 1 (inkl. mat)', value: `${n1(ins.load.dayLoad(0))} kg`, sub: ins.load.source === 'utstyrsliste' ? 'fra utstyrslisten' : 'manuell pulkvekt' },
+    { label: 'På kroppen', value: `${n1(ins.gear.bodyKg)} kg` },
+    { label: 'Pakket', value: `${Math.round(ins.gear.packedPct * 100)} %`, sub: `${ins.gear.count} ting` },
   ]);
   b.h2('Kites (én om gangen)');
   b.table(['Kite', 'Str.', 'Type', 'Vindvindu', 'Brukes', 'Rolle / notat'], KITES.filter((k) => q?.kiteIds.includes(k.id)).map((k) => {
     const o = st.kiteOverrides[k.id];
     return [k.name, `${k.size} m²`, k.type, o ? `${o.low}–${o.high} m/s (ditt)` : 'modell', used.has(k.id) ? `dag ${used.get(k.id)!.join(', ')}` : '–', [st.kiteNotes?.[k.id], k.role].filter(Boolean).join(' · ')];
   }), { colWidths: [38, 13, 26, 26, 20, 'auto'], fontSize: 8 });
-  const cats = [...new Set(st.packing.map((p) => p.cat))];
-  if (cats.length) {
-    b.h2('Pakkeliste');
-    const rows: string[][] = [];
-    cats.forEach((c) => st.packing.filter((p) => p.cat === c).forEach((p) => rows.push([c, `${p.packed ? '[x]' : '[ ]'} ${p.text}`, p.kg ? `${n1(p.kg)} kg` : ''])));
-    b.table(['Kategori', 'Utstyr', 'Vekt'], rows, { colWidths: [34, 'auto', 18], fontSize: 7.8 });
+  const adv = ins.advice.filter((a) => a.level !== 'tips');
+  if (adv.length) {
+    b.h2('Anbefalinger for scenarioet');
+    b.table(['', 'Utstyr', 'Hvorfor'], adv.map((a) => [a.level, a.text, a.why]), { colWidths: [24, 60, 'auto'], fontSize: 7.8 });
   }
-  const f = st.food;
-  const days = snap.summary.days + (f.extraDays ?? 0) + (f.reserveDays ?? 0);
-  b.h2('Mat og brensel');
-  b.p(`${days} dager inkl. reserve · ${f.kcalPerDay} kcal per dag · ca. ${n1((days * f.kcalPerDay) / f.kcalPerKg)} kg mat · ${n1(days * f.fuelLPerDay)} l brensel.`, { size: 9 });
+  if (list?.items.length) {
+    b.h2(`Utstyrsliste: ${list.name}`);
+    const owner = (id?: string) => (id && id !== 'felles' ? st.team.find((m) => m.id === id)?.name ?? '' : 'felles');
+    b.table(['Kategori', 'Utstyr', 'Ant.', 'Vekt', 'Bæres', 'Eier'], list.items.map((g) => [g.cat, `${g.packed ? '[x]' : '[ ]'} ${g.name}`, String(g.qty), assumedKg(g) != null ? `${n1(assumedKg(g)! * g.qty)} kg${g.kg == null ? '*' : ''}` : '', g.carry, owner(g.owner)]), { colWidths: [30, 'auto', 10, 18, 14, 20], fontSize: 7.6 });
+    b.p('* antatt vekt (typisk verdi) – legg inn din egen i appen.', { size: 7.5, color: C.muted });
+  }
+}
+
+function foodPage(b: Brief) {
+  const { snap } = b;
+  const f = snap.insights.food;
+  b.newPage('Mat og vann');
+  b.h1('Mat, vann og brensel', 'Matplan');
+  b.tiles([
+    { label: 'Behov per person/dag', value: `${Math.round(f.target)} kcal` },
+    { label: 'Mat totalt', value: `${n1(f.totalKg)} kg`, sub: `${f.totalDays} døgn × ${f.people} pers.` },
+    { label: 'Vann per dag', value: `${n1(f.waterLPerDay * f.people)} l`, sub: 'smeltes av snø' },
+    { label: 'Brensel', value: `${n1(f.fuelL)} l`, sub: `ca. ${n1(f.fuelL * 0.75)} kg` },
+  ]);
+  b.table(['Dag', 'kcal/person', 'Protein', 'Vekt/person', 'Mat igjen ved start'], f.perDay.map((n, i) => [i < f.days ? `Dag ${i + 1}` : `Reserve ${i - f.days + 1}`, `${Math.round(n.kcal)}${n.kcal < f.target * 0.85 ? ' (lavt)' : ''}`, `${Math.round(n.protein)} g`, `${Math.round(n.g)} g`, i < f.days ? `${n1(f.remainingKgByDay[i] ?? 0)} kg` : '–']), { fontSize: 8 });
+  b.h2('Handleliste');
+  b.table(['Vare', 'Mengde', 'Pakker'], f.shopping.map((x) => [x.food.name, x.g >= 1000 ? `${n1(x.g / 1000)} kg` : `${Math.round(x.g)} g`, x.packs != null ? `${x.packs} × ${x.food.packG} g` : '–']), { colWidths: ['auto', 30, 34], fontSize: 8 });
 }
 
 function weatherPage(b: Brief) {
@@ -951,7 +972,7 @@ function weatherPage(b: Brief) {
   b.newPage('Vær og vind');
   b.h1('Vær og vind per dag', 'Forutsetninger');
   const allManual = snap.run.plan.days.every((d) => d.windMode === 'manuell');
-  b.note(allManual ? 'Alle dager bruker ditt eget vindscenario. Dette er IKKE en værmelding - hent MET-prognosen når turen er innenfor ca. 9 døgn og eksporter på nytt.' : 'Dager merket «MET-prognose» bruker Meteorologisk institutts prognose langs ruten slik den var da den ble hentet. Prognoser endrer seg - sjekk yr.no / varsom.no før avreise.', allManual ? C.amber : C.green);
+  b.note(allManual ? 'Alle dager bruker ditt eget vindscenario. Dette er IKKE en værmelding - hent MET-prognosen når turen er innenfor ca. 9 døgn og eksporter på nytt.' : 'Dager merket «Prognose» bruker prognosen langs ruten fra leverandøren som står i parentes, slik den var da den ble hentet. Prognoser endrer seg - sjekk yr.no / varsom.no før avreise.', allManual ? C.amber : C.green);
   const y0 = b.y;
   snap.run.plan.days.forEach((pd, i) => {
     const x = b.M + (i % 5) * 36;
@@ -966,8 +987,13 @@ function weatherPage(b: Brief) {
   b.table(['Dag', 'Kilde', 'Fra', 'Snitt', 'Spenn', 'Kast', 'Kite', 'Passer kiten?'], snap.run.days.map((d, i) => {
     const pd = snap.run.plan.days[i];
     const fit = d.overShare > 0.25 ? 'For mye vind deler av dagen' : d.underShare > 0.25 ? 'For lite vind deler av dagen' : 'Innenfor kitens område';
-    return [`${d.day}`, pd.windMode === 'manuell' ? 'Eget scenario' : pd.windMode === 'prognose' ? 'MET-prognose' : 'Prognose + justering', `${dirName(pd.wind.dir)} (${pd.wind.dir}°)`, `${n1(pd.wind.avg)} m/s`, `${n1(pd.wind.min)}–${n1(pd.wind.max)}`, `${n1(pd.wind.gust)} m/s`, kiteName(d.kiteId), isReserve(d) ? '–' : fit];
+    return [`${d.day}`, pd.windMode === 'manuell' ? 'Eget scenario' : pd.windMode === 'prognose' ? `Prognose (${providerById(snap.run.plan.weatherSource).short})` : 'Prognose + justering', `${dirName(pd.wind.dir)} (${pd.wind.dir}°)`, `${n1(pd.wind.avg)} m/s`, `${n1(pd.wind.min)}–${n1(pd.wind.max)}`, `${n1(pd.wind.gust)} m/s`, kiteName(d.kiteId), isReserve(d) ? '–' : fit];
   }), { fontSize: 8, colors: snap.run.days.map((d) => hex(DAY_COLORS[(d.day - 1) % DAY_COLORS.length])) });
+  const hz = snap.insights.hazards.filter((h) => h.level !== 'info');
+  if (hz.length) {
+    b.h2('Farlige eller krevende forhold i prognosen');
+    b.table(['Dag', 'Nivå', 'Forhold'], hz.map((h) => [`${h.day}`, h.level === 'viktig' ? 'VIKTIG' : 'ADVARSEL', h.text]), { colWidths: [12, 24, 'auto'], fontSize: 8 });
+  }
   b.p('«Passer kiten?» bygger på modellens kraftberegning for din vekt og pulk, eller ditt eget vindvindu for kiten hvis du har lagt det inn.', { size: 8, color: C.muted });
 }
 
@@ -1151,6 +1177,7 @@ export async function buildPdf(snap: ExportSnapshot, o: PdfOptions): Promise<Blo
     await campsPages(b);
   }
   if (pr.kites && preset === 'full') equipmentPage(b);
+  if (preset === 'full' || preset === 'felt') foodPage(b);
   if (pr.weather && (preset === 'full' || preset === 'kompakt')) weatherPage(b);
   if (pr.safety && preset !== 'rute') safetyPage(b);
   if (preset === 'rute' && pr.waypoints) {
@@ -1169,7 +1196,7 @@ async function comparePdf(b: Brief, ids: string[], step: (m: string) => void): P
   const runs: PlanRun[] = ids.map((id) => snap.st.plans.find((p) => p.id === id)).filter(Boolean).map((p) => runPlan(snap.st, p!));
   briefHeader(b, 'Sammenligning av scenarioer');
   b.sections[0] = 'Sammenligning';
-  const rows = compareRows(runs, snap.st.camps, snap.st.project.destination);
+  const rows = compareRows(runs, snap.st.camps, snap.st.project.destination, snap.st);
   b.table(['', ...runs.map((r) => r.plan.name + (r.plan.id === snap.st.mainPlanId ? ' *' : ''))], rows.map((r) => [r.label, ...r.values.map((v) => v.split(' · ').join('\n'))]), { fontSize: 7.6, colWidths: [28, ...runs.map(() => 'auto' as const)] });
   b.p('* = hovedplan. Alle scenarioer er regnet ut på nytt fra lagrede data da PDF-en ble laget.', { size: 7.8, color: C.muted });
   if (snap.prefs.maps) {

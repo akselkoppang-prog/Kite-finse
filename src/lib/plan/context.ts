@@ -1,6 +1,8 @@
 import { routeHash, type State } from '../../state/store';
 import { kiteInput } from '../../state/sim';
-import { cumulative, densify, type Sample } from '../geo';
+import { cumulative, densify, nearestOnRoute, type Sample } from '../geo';
+import { gearTotals, foodSummary, newFoodPlan } from '../project/model';
+import type { RouteForecastPoint } from '../sim/wind';
 import { cachedElevation } from '../api/kartverket';
 import { finalDescent } from '../analysis/feasibility';
 import { classify } from '../analysis/terrain';
@@ -67,7 +69,52 @@ export function routeOf(st: Pick<State, 'routes' | 'activeRouteId'>, plan?: Pick
   return (plan?.routeId && st.routes.find((r) => r.id === plan.routeId)) || st.routes.find((r) => r.id === st.activeRouteId) || st.routes[0];
 }
 
-export function buildPlanContext(st: State, route: Route): PlanContext | null {
+/** Hvilken prognose et scenario bruker: valgt leverandør hvis den er hentet for denne ruten, ellers MET (eldre data). */
+export function forecastFor(st: State, route: Route, plan?: Pick<PlanScenario, 'weatherSource'>): { points: RouteForecastPoint[] | null; provider: string; fetchedAt?: string; updatedAt?: string } {
+  const id = plan?.weatherSource ?? 'met';
+  const w = st.weather?.[id];
+  if (w && w.routeKey === routeHash(route) && w.points.length) return { points: w.points, provider: id, fetchedAt: w.fetchedAt, updatedAt: w.updatedAt };
+  if (id === 'met' && st.routeForecast?.points.length) return { points: st.routeForecast.points, provider: 'met', fetchedAt: st.routeForecast.fetchedAt };
+  return { points: null, provider: id };
+}
+
+/** Utstyrslisten et scenario bruker. */
+export const gearListOf = (st: Pick<State, 'gearLists'>, plan?: Pick<PlanScenario, 'gearListId'>) => st.gearLists.find((g) => g.id === plan?.gearListId) ?? st.gearLists[0];
+
+/** Overnattinger med påfyll (dag-indekser etter hvilke dere fyller på mat). */
+export const resupplyDays = (st: Pick<State, 'camps'>, plan: PlanScenario) => plan.days.map((d, i) => (d.campId && st.camps.find((c) => c.id === d.campId)?.resupply ? i + 1 : 0)).filter(Boolean);
+
+/** Laveste temperatur vi regner med: prognosen langs ruten hvis den finnes, ellers modellens temperatur. */
+export function minTempFor(st: State, route: Route | undefined, plan: PlanScenario): number {
+  const fc = route ? forecastFor(st, route, plan).points : null;
+  const start = Date.parse(`${plan.tripDate ?? st.tripDate}T00:00:00Z`), end = start + plan.days.length * 86400000;
+  const temps = (fc ?? []).flatMap((p) => p.fc.rows.filter((r) => { const t = Date.parse(r.time); return t >= start && t < end && r.temp != null; }).map((r) => r.temp!));
+  return temps.length ? Math.min(...temps) : st.simParams.tempC;
+}
+
+/** Mat for scenarioet (alle tall per scenario). */
+export function scenarioFood(st: State, plan: PlanScenario, route = routeOf(st, plan)) {
+  const fp = plan.food ?? newFoodPlan(plan.days.length);
+  const people = Math.max(1, st.team.length);
+  const bodyKg = st.team.length ? st.team.reduce((a, m) => a + (m.weightKg ?? st.riderKg), 0) / st.team.length : st.riderKg;
+  return foodSummary(fp, plan.days.length, people, st.meals, st.foods, minTempFor(st, route, plan), resupplyDays(st, plan), bodyKg);
+}
+
+/** Pulkvekt per dag: utstyr (når listen har vekter) + gjenværende mat og brensel. Ellers din manuelle pulkvekt. */
+export function loadModel(st: State, plan: PlanScenario, route = routeOf(st, plan)) {
+  const gear = gearTotals(gearListOf(st, plan));
+  // Bare når du selv har lagt inn vekter, erstatter listen din manuelle pulkvekt (typiske vekter alene endrer ingenting).
+  const explicitKg = (gearListOf(st, plan)?.items ?? []).reduce((acc, g) => acc + (g.kg ?? 0) * Math.max(0, g.qty), 0);
+  if (explicitKg < 1 || gear.pulkKg < 1) return { source: 'manuell' as const, gear, food: null, dayLoad: (_i: number) => st.pulkKg, bodyKg: st.simParams.extraKg };
+  const food = scenarioFood(st, plan, route);
+  const fuelKgPerDay = (food.fuelL * 0.75) / Math.max(1, food.totalDays);
+  const people = food.people;
+  // gruppens felles last fordeles på antall pulker (én per person)
+  const dayLoad = (i: number) => (gear.pulkKg + (food.remainingKgByDay[i] ?? 0) + fuelKgPerDay * Math.max(0, food.totalDays - i)) / people;
+  return { source: 'utstyrsliste' as const, gear, food, dayLoad, bodyKg: gear.bodyKg / people };
+}
+
+export function buildPlanContext(st: State, route: Route, plan?: PlanScenario): PlanContext | null {
   if (route.waypoints.length < 2) return null;
   const profile = routeProfile(route);
   const total = profile.length ? profile[profile.length - 1].d : 0;
@@ -89,17 +136,22 @@ export function buildPlanContext(st: State, route: Route): PlanContext | null {
   if (descent) walkRanges.push([descent.fromD, descent.toD]);
   st.terrain[routeHash(route)]?.samples.forEach((t) => classify(t).cls === 'bratt' && walkRanges.push([t.d - 500, t.d + 500]));
   const quiver = st.quivers.find((q) => q.id === st.activeQuiverId);
-  const params: SimParams = { ...st.simParams, riderKg: st.riderKg, pulkKg: st.pulkKg, snow: st.snow };
+  const lm = plan ? loadModel(st, plan, route) : null;
+  const params: SimParams = { ...st.simParams, riderKg: st.riderKg, pulkKg: st.pulkKg, snow: st.snow, extraKg: lm?.source === 'utstyrsliste' ? lm.bodyKg : st.simParams.extraKg };
+  const crossings = (st.crossings ?? []).map((c) => ({ c, n: nearestOnRoute(route.waypoints, c) })).filter((x) => x.n.dist < 400).map((x) => ({ c: x.c, d: x.n.d }));
   return {
     route: route.waypoints,
     total,
-    tripDate: st.tripDate,
+    tripDate: plan?.tripDate ?? st.tripDate,
+    crossings,
+    dayLoad: lm ? lm.dayLoad : undefined,
+    fatiguePct: st.travel.fatiguePctPerDay,
     params,
     quiver: quiver?.kiteIds.length ? quiver.kiteIds : ['sonic10'],
     kite: (id: string) => kiteInput(id, st),
     zAt,
     walkRanges,
-    forecast: st.routeForecast?.points ?? null,
+    forecast: forecastFor(st, route, plan).points,
     launchMin: st.travel.launchMin,
     navMinPerHour: st.travel.navMinPerHour,
   };
@@ -110,7 +162,7 @@ export interface PlanRun { plan: PlanScenario; route: Route | undefined; ctx: Pl
 /** Kjør ett scenario mot sin egen rute. */
 export function runPlan(st: State, plan: PlanScenario): PlanRun {
   const route = routeOf(st, plan);
-  const ctx = route ? buildPlanContext(st, route) : null;
+  const ctx = route ? buildPlanContext(st, route, plan) : null;
   return { plan, route, ctx, days: ctx ? runExpedition(plan, ctx) : [] };
 }
 

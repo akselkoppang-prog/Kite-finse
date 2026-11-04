@@ -110,7 +110,7 @@ export default function ExportPage() {
       const data = toXlsx(workbook(snap, cmpIds.length > 1 ? cmpIds : []), { title: project.name });
       const name = `${base}.xlsx`;
       download(name, new Blob([data as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-      return `${name} (8 ark${cmpIds.length > 1 ? ' + sammenligning' : ''})`;
+      return `${name} (13 ark${cmpIds.length > 1 ? ' + sammenligning' : ''})`;
     });
 
   const doCsv = (which: 'rute' | 'dager' | 'vind' | 'punkter') =>
@@ -231,7 +231,7 @@ export default function ExportPage() {
 
       <Card title="📊 Excel og CSV">
         <button id="exp-xlsx" className="btn" onClick={doXlsx} disabled={!!busy}>Last ned Excel (.xlsx)</button>
-        <p className="small muted">Ark: Oversikt · Dagsplan · Sjekkpunkter · Rutepunkter · Teltplasser · Vindscenarioer · Kites · Forutsetninger{cmpIds.length > 1 ? ' · Sammenligning' : ''}.</p>
+        <p className="small muted">Ark: Oversikt · Dagsplan · Netter · Sjekkpunkter · Rutepunkter · Teltplasser · Vindscenarioer · Kites · Utstyr · Mat · Handleliste · Oppgaver · Forutsetninger{cmpIds.length > 1 ? ' · Sammenligning' : ''}.</p>
         <div className="btns">
           <button className="btn small ghost" onClick={() => doCsv('rute')} disabled={!!busy}>CSV: rutekoordinater</button>
           <button id="exp-csv-days" className="btn small ghost" onClick={() => doCsv('dager')} disabled={!!busy}>CSV: dagsplan</button>

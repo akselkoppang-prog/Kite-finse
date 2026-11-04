@@ -9,6 +9,8 @@ import { cumulative, densify, dirName, haversine, nearestOnRoute, pointAt, uid }
 import { sunDay } from '../../lib/sun';
 import { DaylightBar } from '../Trip';
 import WindEditor from './WindEditor';
+import DayExplain from './DayExplain';
+import { availableCamps } from '../../lib/plan/insights';
 import KiteChips, { kiteShort } from './KiteChips';
 
 const fmtDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('nb-NO', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -39,7 +41,7 @@ export default function DayCard({ i, day, out, forecastAvailable }: { i: number;
   const startP = pointAt(route.waypoints, cum, out.startD);
   const near = (p: { lat: number; lon: number }) => Object.values(s.places).map((pl) => ({ pl, km: haversine(p, pl) / 1000 })).sort((a, b) => a.km - b.km)[0];
   const nm = (p: { lat: number; lon: number }) => { const n = near(p); return n && n.km < 6 ? `${n.pl.name}${n.km > 1 ? ` (${n.km.toFixed(0)} km unna)` : ''}` : `${(nearestOnRoute(route.waypoints, p).d / 1000).toFixed(0)} km`; };
-  const camps = s.camps.map((c) => ({ c, dist: haversine(c, endP), d: nearestOnRoute(route.waypoints, c).d })).filter((x) => x.dist < 8000).sort((a, b) => a.dist - b.dist);
+  const camps = availableCamps(s, s.activePlanId).map((c) => ({ c, dist: haversine(c, endP), d: nearestOnRoute(route.waypoints, c).d })).filter((x) => x.dist < 8000).sort((a, b) => a.dist - b.dist);
   const chosen = s.camps.find((c) => c.id === day.campId);
   const samples = (local ?? terrain?.samples ?? []).filter((t) => Math.abs(t.d - out.endD) < 4000);
   const sugg = samples.length ? campCandidates(samples, out.endD, 4000, dirName(day.wind.dir), check.barriers, Object.values(s.places), 3) : [];
@@ -53,7 +55,7 @@ export default function DayCard({ i, day, out, forecastAvailable }: { i: number;
   };
   const addCampAt = (lat: number, lon: number, d: number, name: string) => {
     const id = uid('camp');
-    s.set({ camps: [...s.camps, { id, lat, lon, name, night: i + 1, source: 'manuell', role: 'foretrukket', createdAt: new Date().toISOString() }] });
+    s.set({ camps: [...s.camps, { id, lat, lon, name, night: i + 1, source: 'manuell', role: 'foretrukket', kind: 'telt', createdAt: new Date().toISOString() }] });
     set({ campId: id, target: { mode: 'stopp', stopD: d } });
   };
   const findCamps = async () => {
@@ -98,6 +100,8 @@ export default function DayCard({ i, day, out, forecastAvailable }: { i: number;
           <p className="small muted">{out.upwindShare > 0.2 ? `${Math.round(out.upwindShare * 100)} % av strekket er mot vinden (kryssing). ` : ''}{out.underShare > 0.2 ? `${Math.round(out.underShare * 100)} % med for lite vind for kiten. ` : ''}{out.overShare > 0.2 ? `${Math.round(out.overShare * 100)} % med for mye vind. ` : ''}Vind: {out.windSource}.</p>
         </>
       )}
+
+      {!done && <DayExplain out={out} day={day} />}
 
       <DaylightBar sun={sun} startH={day.departure} endH={done ? day.departure : out.arrival} label={`Sol opp ${hhmm(out.sunrise)} · ned ${hhmm(out.sunset)} · ${sun.daylightH.toFixed(1)} t dagslys · reise ${hhmm(day.departure)}–${hhmm(out.arrival)}`} />
 

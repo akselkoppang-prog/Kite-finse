@@ -43,7 +43,7 @@ export default function MapView() {
     L.control.scale({ imperial: false }).addTo(m);
     map.current = m;
     setMapObj(m);
-    ['zones', 'water', 'alts', 'route', 'wind', 'steep', 'cross', 'places', 'camps', 'sub', 'markers', 'breaks', 'arrows', 'draft'].forEach((k) => (groups.current[k] = L.layerGroup().addTo(m)));
+    ['zones', 'water', 'alts', 'route', 'wind', 'steep', 'cross', 'places', 'camps', 'sub', 'markers', 'breaks', 'arrows', 'draft', 'xing'].forEach((k) => (groups.current[k] = L.layerGroup().addTo(m)));
     const coordBox = new L.Control({ position: 'bottomleft' });
     coordBox.onAdd = () => {
       const d = L.DomUtil.create('div', 'coordbox');
@@ -110,7 +110,7 @@ export default function MapView() {
         btn('⛺ Legg til teltplass', () => {
           const id = uid('camp');
           const night = 1;
-          st.set({ camps: [...st.camps, { id, lat, lon: lng, name: `Teltplass ${st.camps.length + 1}`, night, source: 'manuell', createdAt: new Date().toISOString() }], selectedCamp: id, selectedWp: null, selectedMarker: null, selectedBarrier: null });
+          st.set({ camps: [...st.camps, { id, lat, lon: lng, name: `Teltplass ${st.camps.length + 1}`, night, source: 'manuell', kind: 'telt', createdAt: new Date().toISOString() }], selectedCamp: id, selectedWp: null, selectedMarker: null, selectedBarrier: null });
         });
         btn('📝 Notat / markør her', () => {
           const id = uid('mk');
@@ -118,6 +118,7 @@ export default function MapView() {
           st.set({ markers: [...st.markers, { id, lat, lon: lng, name: `Notat ${st.markers.length + 1}`, category: 'note', source: 'Klikket i kart', verification: 'uverifisert', createdAt: now, updatedAt: now }], selectedMarker: id, selectedWp: null, selectedBarrier: null, selectedCamp: null });
         });
         if (r) btn('📍 Sett inn rutepunkt', () => st.insertWaypoint(r.id, lat, lng));
+        btn('⛴ Krysning her (ferje, bro, elv, is …)', () => st.set({ crossings: [...st.crossings, { id: uid('kryss'), name: `Krysning ${st.crossings.length + 1}`, kind: 'elv', lat, lon: lng, waitMin: 0, transferMin: 15 }], tab: 'netter' }));
         L.popup({ closeButton: true, autoPan: true }).setLatLng(e.latlng).setContent(box).openOn(m);
         return;
       }
@@ -432,8 +433,14 @@ export default function MapView() {
     if (!g) return;
     g.clearLayers();
     if (!s.layers.camps) return;
+    const plan = s.plans.find((p) => p.id === s.activePlanId);
+    const ICON: Record<string, string> = { telt: '⛺', hytte: '🏠', gapahuk: '🛖', leirplass: '🏕️', annet: '📍' };
     s.camps.forEach((c) => {
-      const mk = L.marker([c.lat, c.lon], { draggable: true, icon: L.divIcon({ className: '', html: `<div class="camp ${c.approved ? 'approved' : ''} ${c.role === 'foretrukket' ? 'pref' : c.role === 'reserve' ? 'backup' : ''}">⛺<span>N${c.night}${c.role === 'foretrukket' ? '★' : c.role === 'reserve' ? 'R' : ''}${c.approved ? ' ✓' : ''}</span></div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) });
+      // natten i AKTIVT scenario (ikke et felles nattnummer); steder som ikke gjelder scenarioet vises dempet
+      const ni = plan ? plan.days.findIndex((d) => d.campId === c.id) : -1;
+      const other = !!c.scenarioIds?.length && !c.scenarioIds.includes(s.activePlanId);
+      const lbl = ni >= 0 ? `N${ni + 1}★` : other ? 'annet scen.' : '';
+      const mk = L.marker([c.lat, c.lon], { draggable: true, opacity: other ? 0.45 : 1, icon: L.divIcon({ className: '', html: `<div class="camp ${c.approved ? 'approved' : ''} ${ni >= 0 ? 'pref' : ''}">${ICON[c.kind ?? 'telt']}<span>${lbl}${c.capacity != null ? ` ${c.capacity}p` : ''}${c.resupply ? ' 🥫' : ''}${c.approved ? ' ✓' : ''}</span></div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) });
       mk.on('dragend', () => {
         const ll = mk.getLatLng();
         const st = useStore.getState();
@@ -445,7 +452,25 @@ export default function MapView() {
       });
       mk.bindTooltip(`${esc(c.name)} – natt ${c.night}${c.role ? ` (${c.role})` : ''} · ${c.source}. ${c.approved ? 'Brukergodkjent (ikke befart av verktøyet).' : 'IKKE befart.'} Klikk for å redigere.`).addTo(g);
     });
-  }, [s.camps, s.layers.camps]);
+  }, [s.camps, s.layers.camps, s.plans, s.activePlanId]);
+
+  // --- krysninger (ferje, bro, elv, is …) ---
+  useEffect(() => {
+    const g = groups.current.xing;
+    if (!g) return;
+    g.clearLayers();
+    const ICON: Record<string, string> = { ferje: '⛴', båt: '🚤', bro: '🌉', elv: '〰️', vei: '🛣', is: '🧊', grense: '🛂', annet: '⚑' };
+    s.crossings.forEach((c) => {
+      const mk = L.marker([c.lat, c.lon], { draggable: true, icon: L.divIcon({ className: '', html: `<div class="xing">${ICON[c.kind] ?? '⚑'}<span>${esc(c.name)}</span></div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) });
+      mk.on('dragend', () => {
+        const ll = mk.getLatLng();
+        const st = useStore.getState();
+        st.set({ crossings: st.crossings.map((x) => (x.id === c.id ? { ...x, lat: ll.lat, lon: ll.lng } : x)) });
+      });
+      mk.on('click', (e) => { L.DomEvent.stopPropagation(e); useStore.getState().set({ tab: 'netter' }); });
+      mk.bindTooltip(`${esc(c.name)} – ${c.kind}: ${c.schedule ? `avganger ${esc(c.schedule)}` : `venting ${c.waitMin} min`}, overgang ${c.transferMin} min${c.source ? '' : ' (ikke bekreftet)'}. Klikk for å redigere.`).addTo(g);
+    });
+  }, [s.crossings]);
 
   return (
     <>

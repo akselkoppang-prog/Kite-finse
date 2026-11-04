@@ -6,6 +6,7 @@ import { computeWarnings, type Warning } from '../warnings';
 import { addDays } from '../sun';
 import type { ExportPrefs } from '../project/meta';
 import type { Camp, Route } from '../../types';
+import { scenarioInsights, type Insights } from '../plan/insights';
 
 /**
  * Øyeblikksbilde for eksport. Alt i en eksport kommer herfra: ÉN tilstand (fryst referanse), ETT scenario,
@@ -28,6 +29,7 @@ export interface ExportSnapshot {
   endDate: string;
   prefs: ExportPrefs;
   savedOk: boolean;
+  insights: Insights;
 }
 
 export interface SnapshotOpts { planId: string; routeId?: string; prefs: ExportPrefs }
@@ -43,8 +45,10 @@ export async function saveBeforeExport(): Promise<boolean> {
 }
 
 export function takeSnapshot(o: SnapshotOpts, savedOk = true): ExportSnapshot {
-  const st = useStore.getState();
-  const plan0 = st.plans.find((p) => p.id === o.planId) ?? st.plans.find((p) => p.id === st.mainPlanId) ?? st.plans[0];
+  const st0 = useStore.getState();
+  const plan0 = st0.plans.find((p) => p.id === o.planId) ?? st0.plans.find((p) => p.id === st0.mainPlanId) ?? st0.plans[0];
+  // eksporten bruker scenarioets egen avreisedato overalt
+  const st: State = { ...st0, tripDate: plan0.tripDate ?? st0.tripDate };
   // valgt rute overstyrer scenarioets rute bare i denne eksporten (prosjektet endres ikke)
   const plan = o.routeId && o.routeId !== plan0.routeId ? { ...plan0, routeId: o.routeId } : plan0;
   const run = runPlan(st, plan);
@@ -54,6 +58,7 @@ export function takeSnapshot(o: SnapshotOpts, savedOk = true): ExportSnapshot {
   const terrain = route ? st.terrain[routeHash(route)] : undefined;
   const warnings = computeWarnings({ check, terrain, days: run.days, acks: st.acks, overrides: st.lakeOverrides, tripDate: st.tripDate, destination: st.project.destination });
   const campIds = new Set(plan.days.map((d) => d.campId).filter(Boolean) as string[]);
+  const insights = scenarioInsights(st, plan, run.days, route);
   return {
     st,
     generatedAt: new Date().toISOString(),
@@ -69,5 +74,6 @@ export function takeSnapshot(o: SnapshotOpts, savedOk = true): ExportSnapshot {
     endDate: st.project.endDate ?? addDays(st.tripDate, plan.days.length - 1),
     prefs: o.prefs,
     savedOk,
+    insights,
   };
 }

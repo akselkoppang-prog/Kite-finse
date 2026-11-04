@@ -6,7 +6,7 @@ let fail = 0;
 const ok = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) fail++; };
 
 // v5-navigasjon: gamle fanenavn → hovedmeny + undermeny
-const NAV = { 'Kart & rute': ['Oversikt'], 'Overstyringer': ['Utstyr & planlegging', 'Vann-godkjenninger'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Avansert dagsfordeling'], 'Dagene': ['Dagplan', 'Dagene'], 'Kite og vind': ['Vær & kite', 'Kite og vind'], 'Utstyr & offline': ['Utstyr & planlegging', 'Utstyr og mat'], 'Vær & vind': ['Vær & kite', 'Værmelding'], 'Sikkerhet': ['Utstyr & planlegging', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+const NAV = { 'Kart & rute': ['Oversikt'], 'Overstyringer': ['Utstyr & planlegging', 'Vann-godkjenninger'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Avansert dagsfordeling'], 'Dagene': ['Dagplan', 'Dagene'], 'Kite og vind': ['Vær & kite', 'Kite og vind'], 'Utstyr & offline': ['Utstyr & planlegging', 'Utstyr'], 'Vær & vind': ['Vær & kite', 'Værmelding'], 'Sikkerhet': ['Utstyr & planlegging', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
 async function openAdv(p) { await p.evaluate(() => document.querySelectorAll('details.ov-adv').forEach((d) => { d.open = true; })); await p.waitForTimeout(200); }
 async function go(p, name) {
   const [m, s] = NAV[name] || [name];
@@ -173,7 +173,7 @@ const state = async (p) => {
   const pj = JSON.parse(require('child_process').execSync(`python3 -c "import zipfile;z=zipfile.ZipFile('${jp}');print(z.read([n for n in z.namelist() if n.endswith('project.json')][0]).decode())"`).toString());
   const sl = pj.slices;
   ok(pj.version === 3 && sl.lakeOverrides.length >= 1 && sl.quivers && sl.markers.length >= 1 && sl.tripDate === '2027-03-30' && sl.history.length > 0 && sl.travel, 'prosjektfil (ZIP v3) inneholder overstyringer, kites, datoer, markører, historikk, modell');
-  ok(/Matvekt/.test(await p.locator('.page .card', { hasText: 'Mat og brensel' }).innerText()), 'mat/brensel-kalkulator vises');
+  ok(/Mat og vann/.test(await p.locator('.page .card', { hasText: 'Mat og brensel' }).innerText()), 'mat/brensel lenker til matplanen');
   await p.evaluate(() => new Promise((res) => { localStorage.clear(); const r = indexedDB.deleteDatabase('kite-finse-rjukan'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
   await p.goto('about:blank'); await p.goto(URL0); await openAdv(p); await p.waitForSelector('.saveind'); await p.waitForTimeout(1500);
   await go(p, 'Kart & rute');
