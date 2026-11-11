@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { readErrors, onErrors, clearErrors } from '../lib/errlog';
+import { APP_VERSION, BUILD, versionLine } from '../lib/version';
 import { useStore } from '../state/store';
 import { SOURCES } from '../data/sources';
 import { onSourceStatus, sourceStatus } from '../lib/api/http';
@@ -6,7 +8,36 @@ import { wmsLayers, type WmsLayer } from '../lib/api/nve';
 import { Badge, Card, fmtTime } from '../components/ui';
 import { runDiagnostics, type DiagResult } from '../lib/diagnostics';
 import { useSave } from '../storage/persistence';
+import { download } from '../lib/gpx';
 import { elevCacheWarning } from '../lib/api/kartverket';
+
+/** Versjon, byggeinformasjon og feillogg – det du trenger når noe skal feilsøkes. */
+function AboutCard() {
+  const [errs, setErrs] = useState(readErrors);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => onErrors(() => setErrs(readErrors())), []);
+  const report = () => [`Versjon: ${versionLine()} (${BUILD.channel})`, `Nettleser: ${navigator.userAgent}`, `Lagring: ${useSave.getState().state}${useSave.getState().error ? ` – ${useSave.getState().error}` : ''}`, `Tid: ${new Date().toISOString()}`, '', ...errs.map((e) => `${e.at} [${e.version}] ${e.where}: ${e.message}${e.stack ? `\n${e.stack}` : ''}`)].join('\n');
+  return (
+    <Card title="Om appen" className="wide" right={<span className="pill" id="about-version">Versjon {APP_VERSION}</span>}>
+      <div className="kv small">
+        <span>Versjon</span><b className="mono">{BUILD.version}</b>
+        <span>Bygget</span><b>{new Date(BUILD.builtAt).toLocaleString('nb-NO', { dateStyle: 'medium', timeStyle: 'short' })} ({BUILD.builtAt.slice(0, 16).replace('T', ' ')} UTC)</b>
+        <span>Kode</span><b className="mono">{BUILD.commit}{BUILD.dirty ? ' + lokale endringer' : ''}</b>
+        <span>Type bygg</span><b>{BUILD.channel === 'publisert' ? 'Publisert (nummer reservert i byggeløypa)' : BUILD.channel === 'dev' ? 'Utviklingsserver' : BUILD.channel === 'lokal' ? 'Lokalt bygg (ikke publisert)' : BUILD.channel}</b>
+      </div>
+      <p className="small muted">Versjonen er datoen (UTC) pluss løpenummer for bygget den dagen. Den står også i alle eksporterte filer og er uavhengig av prosjektdataene dine.</p>
+      <h4>Feillogg ({errs.length})</h4>
+      {errs.length === 0 ? <p className="small muted">Ingen feil registrert i denne nettleseren.</p> : (
+        <ul className="small list errlog">{errs.slice(0, 10).map((e, i) => <li key={i}><span className="muted">{new Date(e.at).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'medium' })} · {e.version} · {e.where}</span><br />{e.message}</li>)}</ul>
+      )}
+      <div className="btns">
+        <button className="btn small" onClick={async () => { try { await navigator.clipboard.writeText(report()); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch { download('feilrapport.txt', report(), 'text/plain'); } }}>{copied ? 'Kopiert ✓' : 'Kopier feilrapport'}</button>
+        {errs.length > 0 && <button className="btn small ghost" onClick={() => clearErrors()}>Tøm feilloggen</button>}
+      </div>
+      <p className="small muted">Feilrapporten inneholder versjon, nettleser og feilmeldinger – ingen prosjektdata.</p>
+    </Card>
+  );
+}
 
 function Diagnostics() {
   const frost = useStore((s) => s.frostClientId);
@@ -96,6 +127,7 @@ export default function SourcesPage() {
   const [lake, setLake] = useState(() => localStorage.getItem('kite.nveBase.lake') ?? '');
   return (
     <div className="page">
+      <AboutCard />
       <Diagnostics />
       <Card title="Datakilder og status" className="wide">
         <p className="small">

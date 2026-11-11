@@ -4,7 +4,7 @@
 //  - aktivering: gamle app-cacher slettes (ingen opphoping, ingen blanding av versjoner)
 //  - Kartverket-fliser: cache først. API-kall (NVE, MET, Open-Meteo …) caches IKKE her – appen lagrer data selv.
 const VERSION = '__APP_VERSION__';
-const PRECACHE = ["__PRECACHE__"];
+const PRECACHE = "__PRECACHE__";
 const BUILT = !VERSION.startsWith('__');
 const APP_PREFIX = 'kite-app-';
 const APP_CACHE = APP_PREFIX + (BUILT ? VERSION : 'dev');

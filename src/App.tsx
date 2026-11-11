@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useStore, type Tab } from './state/store';
 import { loadInitialGpx } from './lib/actions';
 import MapView from './components/MapView';
@@ -14,30 +14,33 @@ import { useWarnings } from './lib/warnings';
 import { hhmm } from './lib/sim/expedition';
 import { SaveIndicator, SaveBanners } from './components/SaveStatus';
 import { useBlobUrl } from './storage/blobs';
+import ErrorBoundary, { lazyPage } from './components/ErrorBoundary';
+import { UpdateBanner } from './components/UpdateBanner';
+import { versionLine, APP_VERSION } from './lib/version';
 
 // sider som ikke trengs ved oppstart lastes først når de åpnes (raskere start, særlig på iPad)
-const PlannerPage = lazy(() => import('./pages/PlannerPage'));
-const WeatherKitePage = lazy(() => import('./pages/WeatherKitePage'));
-const WindPage = lazy(() => import('./pages/WindPage'));
-const KitePage = lazy(() => import('./pages/KitePage'));
-const SafetyPage = lazy(() => import('./pages/SafetyPage'));
-const DayPlanPage = lazy(() => import('./pages/DayPlanPage'));
-const TimelinePage = lazy(() => import('./pages/TimelinePage'));
-const SourcesPage = lazy(() => import('./pages/SourcesPage'));
-const OverridesPage = lazy(() => import('./pages/OverridesPage'));
-const GearPage = lazy(() => import('./pages/GearPage'));
-const SimulatorPage = lazy(() => import('./pages/SimulatorPage'));
-const ModelPage = lazy(() => import('./pages/ModelPage'));
-const StoragePage = lazy(() => import('./pages/StoragePage'));
-const ScenariosPage = lazy(() => import('./pages/ScenariosPage'));
-const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
-const ExportPage = lazy(() => import('./pages/ExportPage'));
-const VaerPage = lazy(() => import('./pages/VaerPage'));
-const NightsPage = lazy(() => import('./pages/NightsPage'));
-const FoodPage = lazy(() => import('./pages/FoodPage'));
-const StatusPage = lazy(() => import('./pages/StatusPage'));
-const TasksPage = lazy(() => import('./pages/TasksPage'));
-const TechDetails = lazy(() => import('./components/TechDetails'));
+const PlannerPage = lazyPage(() => import('./pages/PlannerPage'));
+const WeatherKitePage = lazyPage(() => import('./pages/WeatherKitePage'));
+const WindPage = lazyPage(() => import('./pages/WindPage'));
+const KitePage = lazyPage(() => import('./pages/KitePage'));
+const SafetyPage = lazyPage(() => import('./pages/SafetyPage'));
+const DayPlanPage = lazyPage(() => import('./pages/DayPlanPage'));
+const TimelinePage = lazyPage(() => import('./pages/TimelinePage'));
+const SourcesPage = lazyPage(() => import('./pages/SourcesPage'));
+const OverridesPage = lazyPage(() => import('./pages/OverridesPage'));
+const GearPage = lazyPage(() => import('./pages/GearPage'));
+const SimulatorPage = lazyPage(() => import('./pages/SimulatorPage'));
+const ModelPage = lazyPage(() => import('./pages/ModelPage'));
+const StoragePage = lazyPage(() => import('./pages/StoragePage'));
+const ScenariosPage = lazyPage(() => import('./pages/ScenariosPage'));
+const ProjectsPage = lazyPage(() => import('./pages/ProjectsPage'));
+const ExportPage = lazyPage(() => import('./pages/ExportPage'));
+const VaerPage = lazyPage(() => import('./pages/VaerPage'));
+const NightsPage = lazyPage(() => import('./pages/NightsPage'));
+const FoodPage = lazyPage(() => import('./pages/FoodPage'));
+const StatusPage = lazyPage(() => import('./pages/StatusPage'));
+const TasksPage = lazyPage(() => import('./pages/TasksPage'));
+const TechDetails = lazyPage(() => import('./components/TechDetails'));
 
 type Main = 'oversikt' | 'plan' | 'vaerkite' | 'utstyr' | 'eksport' | 'innstillinger';
 const SECTIONS: { id: Main; label: string; short?: string; icon: string; subs: [Tab, string][] }[] = [
@@ -132,6 +135,7 @@ export default function App() {
         <HeaderSummary />
       </div>
       <SaveBanners />
+      <UpdateBanner />
       <main className={`main tab-${tab}`}>
         <div className={`mapwrap ${isMap ? '' : 'hidden'}`}>
           <div className={`side ${side ? 'open' : ''}`}>
@@ -157,6 +161,7 @@ export default function App() {
             {tech && <Suspense fallback={<p className="small muted">Laster …</p>}><TechDetails /></Suspense>}
           </details>
         )}
+        <ErrorBoundary key={tab} where={`side: ${tab}`} onHome={() => setTab('oversikt')}>
         <Suspense fallback={<div className="page"><p className="muted">Laster …</p></div>}>
           {tab === 'plan' && <PlannerPage />}
           {tab === 'scenarier' && <ScenariosPage />}
@@ -180,9 +185,11 @@ export default function App() {
           {tab === 'lagring' && <StoragePage />}
           {tab === 'kilder' && <SourcesPage />}
         </Suspense>
+        </ErrorBoundary>
       </main>
       <footer className="foot small muted">
-        Kart © Kartverket (CC BY 4.0) · Hydrologi © NVE · Vær © MET Norge · Skredvarsel © NVE/Varsom. Data hentes direkte fra kildene i nettleseren.
+        Kart © Kartverket (CC BY 4.0) · Hydrologi © NVE · Vær © MET Norge · Skredvarsel © NVE/Varsom. Data hentes direkte fra kildene i nettleseren.{' '}
+        <button className="link verbtn" id="app-version" title={versionLine()} onClick={() => setTab('kilder')}>Versjon {APP_VERSION}</button>
       </footer>
     </div>
     </ExpeditionProvider>

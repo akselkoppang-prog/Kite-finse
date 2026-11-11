@@ -1,4 +1,5 @@
 import { createContext, createElement, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { versionStamp } from '../lib/version';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
 import { useProfile } from './derived';
@@ -168,6 +169,7 @@ export function scenarioFile(id: string) {
     format: SCENARIO_FORMAT,
     version: 1,
     exportedAt: new Date().toISOString(),
+    ...versionStamp(),
     project: st.project.name,
     tripDate: st.tripDate,
     plan: { ...plan, routeId: route?.id },

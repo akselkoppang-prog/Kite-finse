@@ -4,7 +4,10 @@ import App from './App';
 import './styles.css';
 import { registerSW } from './lib/offline';
 import { initPersistence } from './storage/persistence';
+import ErrorBoundary from './components/ErrorBoundary';
+import { installGlobalErrorLog } from './lib/errlog';
 
+installGlobalErrorLog();
 registerSW();
 
 /** Laster prosjektet fra IndexedDB (og migrerer fra gammel lagring første gang) før appen vises. */
@@ -29,6 +32,8 @@ function Boot() {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Boot />
+    <ErrorBoundary where="app" full>
+      <Boot />
+    </ErrorBoundary>
   </React.StrictMode>,
 );

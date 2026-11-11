@@ -1,4 +1,5 @@
 import { jsPDF, GState } from 'jspdf';
+import { APP_VERSION } from '../version';
 import autoTable from 'jspdf-autotable';
 import { cumulative, dirName, fmtDM, haversine, nearestOnRoute, pointAt, type LatLon } from '../geo';
 import { cachedElevation } from '../api/kartverket';
@@ -66,7 +67,7 @@ class Brief {
   sections: (string | null)[] = []; // per side: tekst i toppfeltet (null = forside, ingen topp/bunn)
   constructor(public snap: ExportSnapshot) {
     this.doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
-    this.doc.setProperties({ title: T(snap.st.project.name), subject: 'Ekspedisjonsplan', creator: 'Snowkite-ekspedisjonsplanlegger', author: 'Snowkite-planlegger' });
+    this.doc.setProperties({ title: T(snap.st.project.name), subject: 'Ekspedisjonsplan', creator: `Snowkite-ekspedisjonsplanlegger ${APP_VERSION}`, author: 'Snowkite-planlegger', keywords: `versjon ${APP_VERSION}` });
     this.sections.push(null);
   }
   get W() { return this.doc.internal.pageSize.getWidth(); }
@@ -223,7 +224,7 @@ class Brief {
       this.doc.setDrawColor(...C.line);
       this.doc.line(this.M, H - 11, W - this.M, H - 11);
       this.font(7, 'normal', C.muted);
-      this.doc.text(T(`${scen} · laget ${gen} · planlagte verdier, ikke verifisert i terrenget`), this.M, H - 6.5);
+      this.doc.text(T(`${scen} · laget ${gen} · v${APP_VERSION} · planlagte verdier, ikke verifisert i terrenget`), this.M, H - 6.5);
       this.font(7.5, 'bold', C.navy);
       this.doc.text(`Side ${i} av ${total}`, W - this.M, H - 6.5, { align: 'right' });
     }
@@ -1085,7 +1086,7 @@ function finalPage(b: Brief) {
   }
   b.h2('Forbehold');
   b.note('Denne planen er laget for planlegging. Ruter, teltplasser og kryssinger er tegnet på kart og ikke befart. Simulert fremdrift er en modell - virkeligheten avhenger av snø, vind, sikt, form og utstyr. Vindscenarioer er antakelser med mindre det står «MET-prognose», og prognoser er usikre. «Godkjent av deg» og «vurdert av deg» er dine egne vurderinger, ikke offisielle kontroller. Bruk eget skjønn, sjekk is, skredvarsel og vær lokalt, og snu i tide.', C.red);
-  b.p(`Sist oppdatert: ${new Date(snap.generatedAt).toLocaleString('nb-NO', { dateStyle: 'long', timeStyle: 'short' })}. Prosjekt: ${snap.st.project.name}. Scenario: ${snap.run.plan.name}.`, { size: 8.5, color: C.muted });
+  b.p(`Sist oppdatert: ${new Date(snap.generatedAt).toLocaleString('nb-NO', { dateStyle: 'long', timeStyle: 'short' })}. Prosjekt: ${snap.st.project.name}. Scenario: ${snap.run.plan.name}. Laget med appversjon ${APP_VERSION}.`, { size: 8.5, color: C.muted });
 }
 
 /** Første side for feltbrief / dags-PDF: kompakt topp med nøkkeltall og nødinfo (ingen helsides forside). */

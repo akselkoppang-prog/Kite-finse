@@ -1,4 +1,5 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
+import { APP_VERSION, versionStamp } from '../lib/version';
 import { useStore, type State } from '../state/store';
 import { getDB, type BlobRec } from './db';
 import { projectSnapshot, createBackup } from './backup';
@@ -51,6 +52,7 @@ function projectJson(name: string, includeCaches: boolean) {
     version: VERSION,
     schema: 1,
     exportedAt: new Date().toISOString(),
+    ...versionStamp(),
     name,
     slices: snap.slices,
     routes: snap.routes,
@@ -94,7 +96,7 @@ Innhold
   project/exports/       Ferdige eksporter (GeoJSON, CSV, Excel, PDF) hvis du valgte det.
 
 GPX kan ikke lagre alt (bilder, statuser, scenarioer); alt dette ligger i project.json.
-Formatversjon: ${FORMAT} v${VERSION}.
+Formatversjon: ${FORMAT} v${VERSION}. Laget med appversjon ${APP_VERSION}.
 `;
 
 /** ZIP-arkiv med alt: prosjekt, metadata, ruter som GPX, scenarioer, bilder, vedlegg og (valgfritt) ferdige eksporter. */
@@ -140,6 +142,7 @@ export async function exportZip(projectId: string, name: string, includeCaches =
       format: FORMAT,
       version: VERSION,
       exportedAt: pj.exportedAt,
+      ...versionStamp(),
       name,
       project: st.project,
       mainScenario: main?.name,
@@ -213,7 +216,7 @@ export async function importProject(file: File | Blob, mode: 'new' | 'replace', 
   } else {
     await createBackup('Før import (erstatt prosjekt)', false, true);
     const patch: Record<string, unknown> = { ...converted };
-    for (const k of ['focus', 'editMode', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'selectedCamp', 'simPlay', 'dailyView', 'windPoints', 'format', 'version', 'exportedAt']) delete patch[k];
+    for (const k of ['focus', 'editMode', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'selectedCamp', 'simPlay', 'dailyView', 'windPoints', 'format', 'version', 'exportedAt', 'appVersion', 'appBuiltAt', 'appCommit']) delete patch[k];
     useStore.setState(patch as Partial<State>);
     useStore.getState().log('annet', `Importerte prosjektfil (${format}) og erstattet aktivt prosjekt`);
   }

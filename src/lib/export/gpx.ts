@@ -1,4 +1,5 @@
 import { cumulative, pointAt, type LatLon } from '../geo';
+import { APP_VERSION } from '../version';
 import { cachedElevation } from '../api/kartverket';
 import { hhmm } from '../sim/expedition';
 import type { ExportSnapshot } from './snapshot';
@@ -23,7 +24,7 @@ export function buildGpx(meta: { name: string; desc?: string }, tracks: GpxTrack
   const w = wpts.map((p) => `  <wpt ${ll(p)}>${p.ele != null ? `<ele>${p.ele.toFixed(1)}</ele>` : ''}<name>${esc(p.name)}</name>${p.cmt ? `<cmt>${esc(p.cmt)}</cmt>` : ''}${p.desc ? `<desc>${esc(p.desc)}</desc>` : ''}${p.sym ? `<sym>${esc(p.sym)}</sym>` : ''}${p.type ? `<type>${esc(p.type)}</type>` : ''}</wpt>`);
   const t = tracks.map((tr) => `  <trk>\n    <name>${esc(tr.name)}</name>${tr.desc ? `\n    <desc>${esc(tr.desc)}</desc>` : ''}${tr.type ? `\n    <type>${esc(tr.type)}</type>` : ''}\n    <trkseg>\n${tr.points.map((p) => `      <trkpt ${ll(p)}>${p.ele != null ? `<ele>${p.ele.toFixed(1)}</ele>` : ''}${p.time ? `<time>${p.time}</time>` : ''}${p.name ? `<name>${esc(p.name)}</name>` : ''}</trkpt>`).join('\n')}\n    </trkseg>\n  </trk>`);
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Snowkite-ekspedisjonsplanlegger" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+<gpx version="1.1" creator="Snowkite-ekspedisjonsplanlegger ${APP_VERSION}" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata><name>${esc(meta.name)}</name>${meta.desc ? `<desc>${esc(meta.desc)}</desc>` : ''}<time>${now}</time></metadata>
 ${[...w, ...t].join('\n')}
 </gpx>

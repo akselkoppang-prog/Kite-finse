@@ -1,4 +1,5 @@
 import { cachedElevation } from '../api/kartverket';
+import { versionStamp } from '../version';
 import { hhmm, DAY_COLORS } from '../sim/expedition';
 import { sliceRoute } from './gpx';
 import type { ExportSnapshot } from './snapshot';
@@ -46,7 +47,7 @@ export function exportGeoJson(snap: ExportSnapshot, o: { alternatives: boolean; 
     });
   return {
     type: 'FeatureCollection',
-    metadata: { project: st.project.name, scenario: run.plan.name, tripDate: st.tripDate, generatedAt: snap.generatedAt, crs: 'WGS 84 (EPSG:4326), [lon, lat, høyde m]', source: 'Snowkite-ekspedisjonsplanlegger', disclaimer: 'Planlagte ruter og beregninger – ikke verifisert i terrenget.' },
+    metadata: { project: st.project.name, scenario: run.plan.name, tripDate: st.tripDate, generatedAt: snap.generatedAt, ...versionStamp(), crs: 'WGS 84 (EPSG:4326), [lon, lat, høyde m]', source: 'Snowkite-ekspedisjonsplanlegger', disclaimer: 'Planlagte ruter og beregninger – ikke verifisert i terrenget.' },
     features,
   };
 }

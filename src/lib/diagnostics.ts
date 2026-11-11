@@ -1,4 +1,7 @@
 import { searchPlace, nearestName, elevations } from './api/kartverket';
+import { providerById, fetchAlerts } from './weather/providers';
+import { getDB } from '../storage/db';
+import { BUILD, versionLine } from './version';
 import { discoverLayers, getBases, wmsLayers, envelope } from './api/nve';
 import { forecast } from './api/met';
 import { avalancheWarnings } from './api/varsom';
@@ -147,6 +150,30 @@ export function buildTests(frostId: string): Test[] {
       },
     },
     {
+      id: 'open-meteo',
+      name: 'Open-Meteo (ECMWF / ICON / MET Nordic)',
+      run: async (c) => {
+        for (const id of ['om-ecmwf', 'om-icon', 'om-metno']) {
+          const pr = providerById(id);
+          try {
+            const f = await pr.fetch({ ...FINSE, label: 'Finse' });
+            const r = f.rows[0];
+            c(f.rows.length > 24 && r.windSpeed != null && r.windFrom != null, `${pr.short}: ${f.rows.length} timer, vind ${r.windSpeed} m/s fra ${r.windFrom}°, kast ${r.windGust ?? '–'}, sikt ${r.visibility ?? '–'} m`);
+          } catch (e) {
+            c(false, `${pr.short}: ${(e as Error).message}`);
+          }
+        }
+      },
+    },
+    {
+      id: 'met-alerts',
+      name: 'MET farevarsler (MetAlerts)',
+      run: async (c) => {
+        const a = await fetchAlerts([{ ...FINSE, label: 'Finse' }]);
+        c(true, `${a.length} gjeldende farevarsel(er) for Finse${a[0] ? `: ${a[0].title}` : ''}`);
+      },
+    },
+    {
       id: 'varsom',
       name: 'NVE Varsom snøskredvarsel',
       run: async (c) => {
@@ -179,15 +206,34 @@ export function buildTests(frostId: string): Test[] {
       run: async (c) => {
         const est = navigator.storage?.estimate ? await navigator.storage.estimate() : undefined;
         if (est) c((est.usage ?? 0) < (est.quota ?? Infinity) * 0.9, `Brukt ${(((est.usage ?? 0) / 1048576)).toFixed(1)} MB av ${(((est.quota ?? 0) / 1048576)).toFixed(0)} MB`);
-        let plan = 0;
+        // prosjektet ligger i IndexedDB: kontroller at databasen kan åpnes og leses
         try {
-          plan = (localStorage.getItem('kite.plan.v1') ?? '').length * 2;
-        } catch {
-          /* */
+          const db = await getDB();
+          const n = await db.count('projects');
+          const sl = await db.count('slices');
+          c(n > 0, `IndexedDB åpnet: ${n} prosjekt(er), ${sl} lagrede deler`);
+        } catch (e) {
+          c(false, `IndexedDB kan ikke åpnes: ${(e as Error).message}`);
         }
-        c(plan < 4.5e6, `Planen i localStorage: ${(plan / 1024).toFixed(0)} kB (grense ca. 5 MB)`);
+        const persisted = navigator.storage?.persisted ? await navigator.storage.persisted() : null;
+        c(true, `Varig lagring: ${persisted == null ? 'ukjent i denne nettleseren' : persisted ? 'innvilget' : 'ikke innvilget (nettleseren kan rydde ved plassmangel – ta jevnlig ZIP-kopi)'}`);
         const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
         c(!!reg, `Service worker for offline: ${reg ? 'registrert' : 'ikke registrert (normalt i utviklingsserver)'}`);
+      },
+    },
+    {
+      id: 'version',
+      name: 'Appversjon',
+      run: async (c) => {
+        c(true, `Denne fanen kjører ${versionLine()} (${BUILD.channel})`);
+        if (BUILD.channel === 'dev' || BUILD.channel === 'test') return;
+        try {
+          const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+          const j = res.ok ? await res.json() : null;
+          c(!!j?.version, j?.version ? `Nyeste på serveren: ${j.version}${j.version === BUILD.version ? ' (du er oppdatert)' : ' – last appen på nytt for å oppdatere'}` : 'Fant ikke version.json på serveren');
+        } catch {
+          c(true, 'Kunne ikke spørre serveren om nyeste versjon (uten nett?)');
+        }
       },
     },
   ];

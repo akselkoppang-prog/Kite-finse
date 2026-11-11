@@ -1,4 +1,5 @@
 import type { Route, Waypoint, Camp, Marker, Annotated } from '../types';
+import { APP_VERSION } from './version';
 import { uid } from './geo';
 import { BUILTIN_CATEGORIES } from '../data/categories';
 
@@ -92,7 +93,7 @@ export function toGpx(routes: Route[], camps: Camp[] = [], markers: Marker[] = [
       .join('\n')}\n    </trkseg>\n  </trk>`,
   );
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Snowkite Finse–Rjukan planlegger" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="Snowkite-ekspedisjonsplanlegger ${APP_VERSION}" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata><name>Finse–Rjukan snowkite 2027 (planlegging)</name><desc>Foreslåtte ruter – ikke verifisert. Bilder og fullstendige notater ligger i prosjektfilen (JSON). Eksportert ${now}</desc><time>${now}</time></metadata>
 ${wpts.join('\n')}
 ${trks.join('\n')}

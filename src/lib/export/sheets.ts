@@ -1,4 +1,5 @@
 import { cumulative, dirName, pointAt } from '../geo';
+import { APP_VERSION } from '../version';
 import { cachedElevation } from '../api/kartverket';
 import { hhmm } from '../sim/expedition';
 import { hourOf } from '../sun';
@@ -49,6 +50,7 @@ export function overviewSheet(snap: ExportSnapshot): Sheet {
     ['Pulk (kg)', st.pulkKg],
     ['Kites med', (st.quivers.find((q) => q.id === st.activeQuiverId)?.kiteIds ?? []).map(kiteName).join(', ')],
     ['Generert', new Date(snap.generatedAt).toLocaleString('nb-NO')],
+    ['Appversjon', APP_VERSION],
     ['Merk', 'Planlagte verdier og simuleringer – ikke verifisert i terrenget og ikke værmelding med mindre det står «prognose».'],
   ];
   return { name: 'Oversikt', header: ['Felt', 'Verdi'], rows, widths: [26, 90] };
