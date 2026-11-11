@@ -1,6 +1,7 @@
 import { createContext, createElement, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { versionStamp } from '../lib/version';
-import { useStore } from './store';
+import { useStore, type State } from './store';
+import { sanitize, persistable } from '../storage/persistence';
 import { useShallow } from 'zustand/react/shallow';
 import { useProfile } from './derived';
 import { runExpedition, newDay, type DayPlan, type PlanScenario } from '../lib/sim/expedition';
@@ -180,8 +181,17 @@ export function scenarioFile(id: string) {
 
 /** Importer et delt scenario som NYTT scenario (ruten legges til som ny rute hvis den mangler). Ingenting overskrives. */
 export function importScenario(json: string): string {
-  const f = JSON.parse(json);
-  if (f.format !== SCENARIO_FORMAT || !f.plan) throw new Error('Ikke en scenariofil');
+  let f: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  try {
+    f = JSON.parse(json);
+  } catch {
+    throw new Error('Filen er ikke en gyldig scenariofil (kan ikke leses)');
+  }
+  if (!f || f.format !== SCENARIO_FORMAT || !f.plan || !Array.isArray(f.plan.days) || !f.plan.days.length) throw new Error('Ikke en scenariofil');
+  // rutepunkter uten gyldige koordinater tas ikke med
+  if (f.route && Array.isArray(f.route.waypoints)) f.route.waypoints = f.route.waypoints.filter((w: { lat: unknown; lon: unknown }) => Number.isFinite(w?.lat) && Number.isFinite(w?.lon));
+  if (f.route && (!Array.isArray(f.route.waypoints) || f.route.waypoints.length < 2)) f.route = undefined;
+  f.camps = (Array.isArray(f.camps) ? f.camps : []).filter((c: { id: unknown; lat: unknown; lon: unknown }) => c && typeof c.id === 'string' && Number.isFinite(c.lat) && Number.isFinite(c.lon));
   const st = useStore.getState();
   const idMap = new Map<string, string>();
   let routes = st.routes;
@@ -203,7 +213,7 @@ export function importScenario(json: string): string {
   const now = new Date().toISOString();
   const id = uid('plan');
   const plan: PlanScenario = { ...f.plan, id, name: `${f.plan.name} (importert)`, routeId, createdAt: now, updatedAt: now, days: f.plan.days.map((d: DayPlan) => ({ ...d, id: uid('day'), campId: d.campId ? idMap.get(d.campId) : undefined })) };
-  st.set({ routes, camps, plans: [...st.plans, plan] });
+  st.set(sanitize({ ...persistable(st), routes, camps, plans: [...st.plans, plan] }).state as Partial<State>);
   st.log('annet', `Importerte scenario «${plan.name}»`);
   return id;
 }

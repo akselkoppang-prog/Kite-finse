@@ -21,6 +21,24 @@ Krever Node 18+. Ingen API-nøkler trengs (per nov. 2026).
 **GitHub Pages:** workflowen `.github/workflows/pages.yml` bygger og publiserer ved push til `main`.
 Slå på Pages i repoets innstillinger (Settings → Pages → Source: GitHub Actions).
 
+## Versjon og kvalitetssikring
+
+**Versjon: `ÅÅÅÅ.MM.DD.BYGG`** (UTC-dato + løpenummer som starter på 001 hver dag), f.eks. `2026.11.10.001`, `2026.11.10.002`, `2026.11.11.001`.
+
+- Lages i selve byggingen (`vite build` → `scripts/version.mjs`), ikke i forhåndsvisning. Uavhengig av bruker- og prosjektdata.
+- **Publiserte bygg** (GitHub Actions, `VERSION_RESERVE=1`): nummeret reserveres som git-tagg `vÅÅÅÅ.MM.DD.NNN` på origin. Git-serveren godtar bare én slik tagg, så to samtidige bygg kan aldri få samme versjon (testet med 8 samtidige bygg).
+- **Lokale bygg** teller i `.version-state.json` (låst mot samtidige bygg) og får endelsen `-lokal`, så de aldri forveksles med en publisert versjon. Utviklingsserveren viser `…000-dev`.
+- Ett sted i koden: `src/lib/version.ts`. Vises i bunnteksten og under Innstillinger → Datakilder → «Om appen», og står i `dist/version.json`, service workeren, PDF (hver side), GPX, GeoJSON, Excel, prosjekt-ZIP og scenariofiler.
+
+**Robusthet**
+
+- Alle data som lastes eller importeres (oppstart, ZIP/JSON, sikkerhetskopi, nødkopi, scenariofil) går gjennom `src/storage/sanitize.ts`: gyldige data beholdes uendret, manglende felt får standardverdier, og bare ubrukelige elementer (f.eks. rutepunkt uten koordinater) utelates.
+- Feilgrense rundt hver side og rundt hele appen: en feil på én side stopper ikke resten, og dataene er urørt. Feil noteres i en liten feillogg (Innstillinger → Datakilder) som kan kopieres.
+- Service worker per versjon: hele appen lagres for bruk uten nett (også sider som aldri er åpnet), gamle versjoner ryddes bort, og kartfliser beholdes. Appen sier fra når en nyere versjon er lagt ut og lagrer før den laster inn på nytt. Mangler en sidefil etter en oppdatering, laster appen seg selv på nytt.
+- Tekst fra importerte filer settes aldri inn som HTML (kartetiketter, utskrift), og lenker fra data må være http/https.
+
+**Sjekker**: `npm run typecheck` · `npm run lint` · `npm test` (logikk, simulering, lagring, eksport, planlegging/validering, versjon) · nettlesertester i `tests/e2e/` (`prod-offline.cjs` tester det ferdige bygget med service worker; `audit-crawl.cjs` åpner alle sider, tomt prosjekt, ugyldige filer og rare verdier).
+
 ## Versjon 7 – én sammenhengende ekspedisjonsplan
 
 Hvert **scenario** er nå en fullstendig plan: egen avreisedato, rute, værkilde, vind/kite/tider per dag, overnattinger, utstyrsliste og matplan. Alt regnes ut ett sted (`src/lib/plan/insights.ts`), så kart, dagkort, vær, utstyr, mat, status og eksport viser de samme tallene. Endringer i ett scenario rører aldri et annet.

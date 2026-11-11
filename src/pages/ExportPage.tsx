@@ -127,7 +127,10 @@ export default function ExportPage() {
     run('ZIP', async (snap) => {
       const { exportZip } = await import('../storage/archive');
       const extra: Record<string, Uint8Array> = {};
+      let skipped = '';
       if (withExports) {
+        // sikkerhetskopien skal ALLTID kunne lages – feiler de ferdige eksportene (f.eks. ingen rute), tas de bare ikke med
+        try {
         setBusy({ what: 'ZIP', msg: 'Lager eksporter …' });
         const [{ exportGeoJson }, S, { toXlsx, toCsv }, { exportGpx }] = await Promise.all([import('../lib/export/geojson'), import('../lib/export/sheets'), import('../lib/export/table'), import('../lib/export/gpx')]);
         extra['rute.geojson'] = strToU8(JSON.stringify(exportGeoJson(snap, { alternatives: true, days: true, markers: true, camps: true, zones: true })));
@@ -137,12 +140,16 @@ export default function ExportPage() {
         snap.run.days.forEach((d) => { if (!d.reason.startsWith('allerede')) extra[`dag-${d.day}.gpx`] = strToU8(exportGpx(snap, { kind: 'dag', day: d.day, withCamps: true, withWaypoints: true, withMarkers: false }).xml); });
         setBusy({ what: 'ZIP', msg: 'Lager PDF …' });
         extra['ekspedisjonsplan.pdf'] = new Uint8Array(await (await makePdf(snap, 'alle')).arrayBuffer());
+        } catch (e) {
+          skipped = ` (uten ferdige eksporter: ${(e as Error).message})`;
+          for (const k of Object.keys(extra)) delete extra[k];
+        }
       }
       setBusy({ what: 'ZIP', msg: 'Pakker prosjektet …' });
       const z = await exportZip(projectId, project.name, false, extra);
       const name = `${slug(project.name)}_prosjekt_${new Date().toISOString().slice(0, 10)}.zip`;
       download(name, z, 'application/zip');
-      return `${name} (${(z.size / 1024 / 1024).toFixed(1)} MB) – kan importeres i en annen nettleser`;
+      return `${name} (${(z.size / 1024 / 1024).toFixed(1)} MB) – kan importeres i en annen nettleser${skipped}`;
     });
 
   const doScenario = () =>

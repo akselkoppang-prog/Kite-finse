@@ -263,9 +263,9 @@ const state = async (p) => {
   ok(await p.locator('.dl.astro').count() > 5, 'tussmørkebånd tegnet');
   await p.screenshot({ path: dir + '/v3-sun.png', fullPage: true });
   await go(p, 'Datakilder & diagnose'); await p.waitForTimeout(300);
-  await p.click('button:has-text("Kjør alle tester nå")'); await p.waitForTimeout(12000);
+  await p.click('button:has-text("Kjør alle tester nå")'); await p.locator('.diagrow', { hasText: 'Appversjon' }).waitFor({ timeout: 90000 }).catch(() => {});
   const dg = await p.locator('.page .card', { hasText: 'Live-diagnose' }).innerText();
-  ok(/Kartverket topo-fliser/.test(dg) && /MET Locationforecast/.test(dg) && /Solberegning/.test(dg), 'live-diagnose kjører alle tester');
+  ok(/Kartverket topo-fliser/.test(dg) && /MET Locationforecast/.test(dg) && /Open-Meteo/.test(dg) && /Solberegning/.test(dg) && /Appversjon/.test(dg) && /Denne fanen kjører \d{4}\.\d\d\.\d\d\.\d{3}/.test(dg), 'live-diagnose kjører alle tester (inkl. nye værkilder og appversjon)');
   console.log('DIAGNOSE (sandkasse uten nett, stubber for noen):', dg.split('\n').filter((l) => /^(OK|FEIL|HOPPET)/.test(l)).join(' | ').slice(0, 600));
 
   const m = await b.newContext({ ...devices['iPhone 13'], serviceWorkers: 'block' });

@@ -164,22 +164,36 @@ async function readFile(file: File | Blob): Promise<{ state: Record<string, unkn
   const images: { id: string; rec: Omit<BlobRec, 'projectId'> }[] = [];
   let pj: Record<string, unknown>;
   if (isZip) {
-    const files = unzipSync(new Uint8Array(await file.arrayBuffer()));
+    let files: Record<string, Uint8Array>;
+    try {
+      files = unzipSync(new Uint8Array(await file.arrayBuffer()));
+    } catch {
+      throw new Error('ZIP-filen er skadet eller ufullstendig');
+    }
     // project.json i roten (eldre arkiv) eller i en mappe (project/project.json)
     const pjPath = files['project.json'] ? 'project.json' : Object.keys(files).filter((k) => k.endsWith('/project.json')).sort((a, b) => a.length - b.length)[0];
     if (!pjPath) throw new Error('ZIP-filen mangler project.json');
     const root = pjPath.slice(0, pjPath.length - 'project.json'.length);
-    pj = JSON.parse(strFromU8(files[pjPath]));
+    try {
+      pj = JSON.parse(strFromU8(files[pjPath]));
+    } catch {
+      throw new Error('project.json i ZIP-filen er skadet og kan ikke leses');
+    }
     const metaRaw = files[`${root}metadata.json`];
     const meta = metaRaw ? JSON.parse(strFromU8(metaRaw)) : { blobs: {} };
     for (const [id, m] of Object.entries(meta.blobs ?? {}) as [string, { path: string; name: string; mime: string; role: 'main' | 'thumb'; parentId?: string; kind: 'bilde' | 'vedlegg'; hash: string; width?: number; height?: number }][]) {
       const data = files[root + m.path] ?? files[m.path];
       if (!data) continue;
-      const blob = new Blob([data], { type: m.mime });
+      const blob = new Blob([data as BlobPart], { type: m.mime });
       images.push({ id, rec: { id, kind: m.kind, role: m.role, parentId: m.parentId, name: m.name, mime: m.mime, size: blob.size, hash: m.hash, blob, width: m.width, height: m.height, createdAt: new Date().toISOString() } });
     }
   } else {
-    pj = JSON.parse(await file.text());
+    try {
+      pj = JSON.parse(await file.text());
+    } catch {
+      throw new Error('Filen er verken en gyldig ZIP- eller JSON-fil fra appen');
+    }
+    if (!pj || typeof pj !== 'object' || Array.isArray(pj)) throw new Error('Ukjent filformat (ikke et prosjekt)');
     for (const [id, m] of Object.entries((pj.images as Record<string, { name: string; mime: string; role: 'main' | 'thumb'; parentId?: string; hash: string; data: string; width?: number; height?: number }>) ?? {})) {
       const blob = fromB64(m.data, m.mime);
       images.push({ id, rec: { id, kind: 'bilde', role: m.role, parentId: m.parentId, name: m.name, mime: m.mime, size: blob.size, hash: m.hash, blob, width: m.width, height: m.height, createdAt: new Date().toISOString() } });
