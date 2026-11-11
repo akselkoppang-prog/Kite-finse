@@ -209,15 +209,27 @@ export async function importProject(file: File | Blob, mode: 'new' | 'replace', 
     for (const im of images) tx.store.put({ ...im.rec, projectId: pid });
     await tx.done;
   }
-  const converted = legacy ? await extractImages(state, pid) : state;
+  const { sanitize, persistable } = await import('./persistence');
+  let converted: Record<string, unknown>;
+  try {
+    // valider innholdet før noe skrives (ugyldige punkter utelates, manglende felt får standardverdier)
+    converted = sanitize(legacy ? await extractImages(state, pid) : state).state;
+    if (mode === 'new') await writeStateAsProject(converted, pid, name);
+  } catch (e) {
+    // rydd bildene som ble lagt inn for et prosjekt som ikke ble opprettet
+    if (mode === 'new' && images.length) {
+      const tx = db.transaction('blobs', 'readwrite');
+      for (const im of images) tx.store.delete(im.id);
+      await tx.done.catch(() => undefined);
+    }
+    throw e;
+  }
   const routes = (converted.routes as Route[]) ?? [];
-  if (mode === 'new') {
-    await writeStateAsProject(converted, pid, name);
-  } else {
+  if (mode !== 'new') {
     await createBackup('Før import (erstatt prosjekt)', false, true);
     const patch: Record<string, unknown> = { ...converted };
     for (const k of ['focus', 'editMode', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'selectedCamp', 'simPlay', 'dailyView', 'windPoints', 'format', 'version', 'exportedAt', 'appVersion', 'appBuiltAt', 'appCommit']) delete patch[k];
-    useStore.setState(patch as Partial<State>);
+    useStore.setState(sanitize({ ...persistable(useStore.getState()), ...patch }).state as Partial<State>);
     useStore.getState().log('annet', `Importerte prosjektfil (${format}) og erstattet aktivt prosjekt`);
   }
   return { name, routes: routes.length, images: images.filter((i) => i.rec.role === 'main').length, format, projectId: pid };

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # for å reservere versjonsnummeret som git-tagg (vYYYY.MM.DD.NNN)
   pages: write
   id-token: write
 
@@ -24,7 +24,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm test
       - run: npm run build
+        env:
+          VERSION_RESERVE: '1' # publisert bygg: unikt løpenummer per dag (UTC)
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

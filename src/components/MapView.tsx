@@ -145,7 +145,21 @@ export default function MapView() {
 
   // --- focus ---
   useEffect(() => {
-    if (s.focus && map.current) map.current.flyTo([s.focus.lat, s.focus.lon], s.focus.zoom ?? Math.max(map.current.getZoom(), 13), { duration: 0.8 });
+    const f = s.focus;
+    const m = map.current;
+    if (!f || !m || !Number.isFinite(f.lat) || !Number.isFinite(f.lon)) return;
+    // Kartet kan være skjult (0×0 px) når en knapp på en annen side hopper hit. Å animere et kart uten
+    // størrelse gir «Invalid LatLng (NaN, NaN)». Vent til kartet er synlig og har fått størrelse.
+    let tries = 0;
+    let timer = 0;
+    const go = () => {
+      m.invalidateSize();
+      const sz = m.getSize();
+      if (sz.x > 0 && sz.y > 0) m.setView([f.lat, f.lon], f.zoom ?? Math.max(m.getZoom(), 13), { animate: tries === 0, duration: 0.8 });
+      else if (tries++ < 20) timer = window.setTimeout(go, 100);
+    };
+    go();
+    return () => clearTimeout(timer);
   }, [s.focus]);
 
   const fitted = useRef(false);

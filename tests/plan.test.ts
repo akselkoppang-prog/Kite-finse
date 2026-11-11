@@ -9,6 +9,7 @@ import { defaultModel } from '../src/data/kiteSpecs';
 import { DEFAULT_SIM } from '../src/lib/sim/physics';
 import { destination, cumulative } from '../src/lib/geo';
 import type { Insights } from '../src/lib/plan/insights';
+import { sanitizeState } from '../src/storage/sanitize';
 
 let fail = 0;
 const ok = (c: unknown, m: string) => {
@@ -105,6 +106,26 @@ const heavyRun = runExpedition(plan, { ...ctx, dayLoad: (i) => (i === 0 ? 90 : 4
 ok(heavyRun[0].loadKg === 90 && heavyRun[1].loadKg === 40, 'last per dag fra utstyr + mat brukes i simuleringen');
 const tired = runExpedition(plan, { ...ctx, fatiguePct: 10 });
 ok(tired[1].fatigueFactor === 0.9 && tired[0].fatigueFactor === 1, 'tretthet: dag 2 fart ×0,9');
+
+// ---------- validering av lastede/importerte data ----------
+const INIT = { tripDate: '2027-03-25', tripDays: 3, riderKg: 70, pulkKg: 40, routes: [], camps: [], markers: [], crossings: [], zones: [], plans: [], compareIds: [], mainPlanId: 'plan-main', activePlanId: 'plan-main', activeRouteId: null, quivers: [{ id: 'q', name: 'Q', kiteIds: ['sonic10'] }], activeQuiverId: 'q', gearLists: [], foods: DEFAULT_FOODS, meals: DEFAULT_MEALS, team: [], tasks: [], expenses: [], documents: [], simParams: { ...DEFAULT_SIM }, layers: { base: 'topo', camps: true }, places: {}, weather: {}, acks: {}, budget: 0 };
+const junk = sanitizeState({ tripDate: 'i morgen', riderKg: 'tung', pulkKg: NaN, routes: [{ id: 'r', name: 5, waypoints: [{ lat: 'abc', lon: null }, { lat: 60.5, lon: 7.5 }, { lat: 999, lon: 7 }, { lat: 60.4, lon: 7.6, eleGpx: 'x' }] }, { waypoints: [] }, 'tull'], camps: [{ id: 'c1', lat: 60, lon: 8, capacity: '<b>' }, { id: 'c2', lat: null, lon: 8 }, 7], plans: 'feil', activePlanId: 'finnes-ikke', quivers: [{ id: 'q1', kiteIds: ['sonic10', 'ukjent-kite'] }], gearLists: 'x', simParams: { comfortKmh: 'rask' }, layers: { base: 'topo' }, team: [{ id: 't', weightKg: 'x' }, null], tasks: [{ id: 'k', due: 'snart' }], expenses: [{ id: 'e', amount: 'mye' }], weather: { met: { routeKey: 5 } }, acks: { a: 'ok', b: 5 }, extra: 'beholdes' }, INIT);
+const J = junk.state as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+ok(J.tripDate === '2027-03-25' && J.riderKg === 70 && J.pulkKg === 40, 'ugyldig dato og vekter får standardverdier');
+ok(J.routes.length === 1 && J.routes[0].waypoints.length === 2 && J.routes[0].name === 'Rute uten navn' && J.routes[0].waypoints[1].eleGpx === undefined && J.activeRouteId === 'r', 'ruter: punkter uten gyldige koordinater utelates, resten beholdes');
+ok(J.camps.length === 1 && J.camps[0].capacity === 0, 'teltplasser uten koordinater utelates; tallfelt blir tall');
+ok(J.plans.length === 1 && J.plans[0].days.length === 3 && J.activePlanId === J.plans[0].id && J.mainPlanId === J.plans[0].id, 'manglende scenarioer erstattes av en standard hovedplan med gyldige pekere');
+ok(J.quivers[0].kiteIds.join() === 'sonic10' && J.activeQuiverId === 'q1', 'ukjente kites fjernes fra utvalget');
+ok(J.simParams.comfortKmh === DEFAULT_SIM.comfortKmh && J.simParams.tackSec === DEFAULT_SIM.tackSec && J.layers.camps === true, 'innstillinger: ugyldige og manglende felt fylles fra standard');
+ok(J.gearLists.length === 1 && J.team.length === 1 && J.team[0].weightKg === 75 && J.tasks[0].due === undefined && J.expenses[0].amount === 0, 'utstyr, team, oppgaver og utgifter repareres');
+ok(Object.keys(J.weather).length === 0 && Object.keys(J.acks).join() === 'a' && J.extra === 'beholdes', 'ugyldig hurtigbuffer forkastes; ukjente felt følger med urørt');
+ok(junk.report.fixed.length >= 3, `rapport over hva som ble reparert (${junk.report.fixed.length} punkter)`);
+const good = { ...INIT, plans: [{ id: 'p1', name: 'A', tripDate: '2027-04-01', createdAt: 'x', updatedAt: 'x', days: [newDay({ departure: 9.5, kiteId: 'sonic10' })] }], activePlanId: 'p1', mainPlanId: 'p1', tripDate: '2027-04-01', tripDays: 1 };
+const g2 = sanitizeState(good, INIT);
+ok(JSON.stringify((g2.state.plans as PlanScenario[])[0].days[0]) === JSON.stringify(good.plans[0].days[0]) && g2.report.fixed.length === 0, 'gyldige data går uendret gjennom (ingen stille endringer)');
+const dup = sanitizeState({ ...good, plans: [good.plans[0], { ...good.plans[0], name: 'kopi' }] }, INIT);
+ok((dup.state.plans as PlanScenario[]).length === 1, 'to scenarioer med samme id slås ikke sammen ved redigering (duplikat fjernes)');
+ok(sanitizeState({ plans: null, routes: undefined, camps: {} } as never, INIT).state != null, 'validering kaster aldri feil på søppel');
 
 console.log(fail ? `${fail} FEIL` : 'ALLE PLANLEGGINGSTESTER OK');
 if (fail) process.exit(1);

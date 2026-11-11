@@ -6,7 +6,7 @@ import { dayWeather, type DayWx } from '../weather/analysis';
 import { gearAdvice, type Advice, type GearContext } from '../project/advice';
 import { gearTotals } from '../project/model';
 import { KITES } from '../../data/kites';
-import { haversine } from '../geo';
+import { nearestOnRoute } from '../geo';
 import type { DayOutcome, PlanScenario } from '../sim/expedition';
 import type { Camp, Route } from '../../types';
 
@@ -67,9 +67,7 @@ export function scenarioInsights(st: State, plan: PlanScenario, days: DayOutcome
     if (d.daylightLeftH != null && d.daylightLeftH < 0.5 && !d.reason.startsWith('allerede')) issues.push('Ankomst nær eller etter mørket');
     let offRouteKm: number | null = null;
     if (camp && route) {
-      // avstand fra dagens sluttpunkt til teltplassen
-      const p = route.waypoints.reduce((b, w) => (haversine(w, camp) < haversine(b, camp) ? w : b), route.waypoints[0]);
-      offRouteKm = haversine(p, camp) / 1000;
+      offRouteKm = nearestOnRoute(route.waypoints, camp).dist / 1000; // korteste avstand til rutelinjen
     }
     nights.push({ night: i + 1, date: d.date, camp, endD: d.endD, arrival: d.arrival, distFromPrevKm: (d.endD - prevD) / 1000, offRouteKm, capacityOk, issues });
     prevD = d.endD;

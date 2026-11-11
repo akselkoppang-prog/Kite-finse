@@ -7,6 +7,7 @@ import { majorChange } from './hooks';
 import { migrateFromLocalStorage, type MigrationReport } from './migrate';
 import { elevSnapshot, elevDirty, loadElevCache, markElevSaved } from '../lib/api/kartverket';
 import type { Route } from '../types';
+import { sanitizeState } from './sanitize';
 import { gearFromPacking, DEFAULT_TASKS } from '../lib/project/model';
 import type { PackItem } from '../data/packing';
 
@@ -49,6 +50,11 @@ const lastRefs = new Map<string, unknown>();
 const lastRoutes = new Map<string, Route>();
 const lastCaches = new Map<string, unknown>();
 let hydrating = true;
+/** Hva som ble reparert sist et prosjekt ble lastet (vises i lagringssiden). */
+export let hydrateNotes: string[] = [];
+
+/** Valider en hel eller delvis tilstand mot appens standardverdier. */
+export const sanitize = (raw: Record<string, unknown>) => sanitizeState(raw, INITIAL);
 let saving: Promise<void> | null = null;
 let pending = false;
 let timer: number | undefined;
@@ -68,6 +74,14 @@ function dirtyRoutes(st: State): { changed: Route[]; deleted: string[] } {
     changed: st.routes.filter((r) => lastRoutes.get(r.id) !== r),
     deleted: [...lastRoutes.keys()].filter((id) => !ids.has(id)),
   };
+}
+
+/** Alle lagringsbare felt i tilstanden (uten funksjoner og kortvarig UI-tilstand). */
+export function persistable(st: State): Record<string, unknown> {
+  const raw = st as unknown as Record<string, unknown>;
+  const o: Record<string, unknown> = { routes: st.routes };
+  for (const keys of Object.values(SLICES)) for (const k of keys) o[k as string] = raw[k as string];
+  return o;
 }
 
 export function isDirty(): boolean {
@@ -292,6 +306,11 @@ export async function hydrate(projectId: string) {
   if (!next.mainPlanId || !(next.plans as { id: string }[]).some((p) => p.id === next.mainPlanId)) next.mainPlanId = (next.plans as { id: string }[])[0]?.id;
   if (!(next.plans as { id: string }[]).some((p) => p.id === next.activePlanId)) next.activePlanId = next.mainPlanId;
   if (elev?.value) loadElevCache(elev.value as Record<string, never>);
+  // valider og reparer før noe tas i bruk (eldre versjoner, håndredigerte eller skadde data)
+  const clean = sanitizeState(next, INITIAL);
+  if (clean.report.fixed.length) console.warn('Prosjektdata ble reparert ved lasting:', clean.report.fixed);
+  Object.assign(next, clean.state);
+  hydrateNotes = clean.report.fixed;
   useStore.setState({ ...(next as Partial<State>), selectedWp: null, selectedMarker: null, selectedBarrier: null, selectedCamp: null, dailyView: null });
   const st = useStore.getState() as unknown as Record<string, unknown>;
   lastRefs.clear();
@@ -403,7 +422,9 @@ export function applyRecovery(apply: boolean) {
     Object.values(j.slices).forEach((v) => Object.assign(patch, v));
     const st = useStore.getState();
     const routes = [...st.routes.filter((r) => !j.deletedRoutes.includes(r.id) && !j.routes.some((x) => x.id === r.id)), ...j.routes];
-    useStore.setState({ ...(patch as Partial<State>), routes });
+    // valider nødkopien sammen med gjeldende tilstand (pekere mellom delene må stemme)
+    const merged = sanitize({ ...persistable(st), ...patch, routes }).state;
+    useStore.setState(merged as Partial<State>);
   } else {
     // forkastet nødkopi beholdes som backup – ingenting slettes stille
     void getDB().then((db) => db.put('backups', { id: `bk_${Date.now()}`, projectId: j.projectId, createdAt: new Date().toISOString(), reason: 'Forkastet nødkopi (ulagrede endringer)', size: JSON.stringify(j).length, data: JSON.stringify({ emergency: j }), auto: false, keep: true }));

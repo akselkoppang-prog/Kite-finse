@@ -1,7 +1,7 @@
 import { simulate, type SimResult, type WindProvider } from './route';
 import { forecastProvider, manualProvider, type RouteForecastPoint } from './wind';
 import type { KiteInput, SimParams } from './physics';
-import { addDays, hourOf, sunDay } from '../sun';
+import { addDays, atLocalHour, hourOf, sunDay } from '../sun';
 import { cumulative, pointAt, type LatLon } from '../geo';
 import { uid } from '../geo';
 import { crossingDelay, type Crossing } from '../project/model';
@@ -285,7 +285,7 @@ export function runExpedition(plan: PlanScenario, ctx: PlanContext): DayOutcome[
     const loadKg = ctx.dayLoad ? ctx.dayLoad(i) : ctx.params.pulkKg;
     const params = { ...ctx.params, pulkKg: loadKg };
     const fatigueFactor = Math.max(0.75, 1 - ((ctx.fatiguePct ?? 0) / 100) * i);
-    const dayStartMs = Date.parse(`${date}T00:00:00Z`) + (d.departure - 1) * 3600000;
+    const dayStartMs = atLocalHour(date, d.departure).getTime(); // lokal tid (riktig også i sommertid)
     const wxRows: ForecastRow[] = [];
     if (d.windMode !== 'manuell' && ctx.forecast?.length) {
       const reach = start + d.speedKmh * d.activeH * 1000;

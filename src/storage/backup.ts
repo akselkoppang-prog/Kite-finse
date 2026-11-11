@@ -77,11 +77,15 @@ export async function restoreBackup(id: string): Promise<void> {
     Object.values(j.slices as Record<string, Record<string, unknown>>).forEach((v) => Object.assign(patch, v));
     await createBackup('Før gjenoppretting av nødkopi', false, true);
     const st = useStore.getState();
-    useStore.setState({ ...(patch as Partial<State>), routes: [...st.routes.filter((r) => !j.routes.some((x: { id: string }) => x.id === r.id)), ...j.routes] });
+    const { sanitize, persistable } = await import('./persistence');
+    const routes = [...st.routes.filter((r) => !(j.routes ?? []).some((x: { id: string }) => x.id === r.id)), ...(Array.isArray(j.routes) ? j.routes : [])];
+    useStore.setState(sanitize({ ...persistable(st), ...patch, routes }).state as Partial<State>);
   } else {
     if (!parsed.slices || !Array.isArray(parsed.routes)) throw new Error('Kopien har ukjent format');
     await createBackup('Før gjenoppretting', false, true);
-    useStore.setState({ ...(parsed.slices as Partial<State>), routes: parsed.routes });
+    // valider kopien sammen med gjeldende tilstand (felt som ikke fantes da kopien ble tatt, beholdes)
+    const { sanitize, persistable } = await import('./persistence');
+    useStore.setState(sanitize({ ...persistable(useStore.getState()), ...(parsed.slices as Record<string, unknown>), routes: parsed.routes }).state as Partial<State>);
   }
   useStore.getState().log('annet', 'Gjenopprettet sikkerhetskopi');
   const { flush } = await import('./persistence');

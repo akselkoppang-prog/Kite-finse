@@ -35,12 +35,10 @@ export function readiness(o: {
   const fOk = !ins.food.shortDays.length;
   areas.push({ id: 'mat', label: 'Mat og vann', score: fOk ? 1 : 0.5, status: fOk ? 'ok' : 'obs', detail: `${ins.food.totalDays} døgn · ${ins.food.totalKg.toFixed(1)} kg · ${ins.food.fuelL.toFixed(1)} l brensel`, todo: fOk ? [] : [{ text: `For lite energi dag ${ins.food.shortDays.join(', ')}`, tab: 'mat' }] });
   // overnatting
-  const need = ins.nights.filter((n) => !n.issues.includes('Ingen overnatting valgt') || n.camp).length;
   const chosen = ins.nights.filter((n) => n.camp).length;
   const nIssues = ins.nights.flatMap((n) => n.issues.map((t) => `Natt ${n.night}: ${t}`));
   const nScore = ins.nights.length ? chosen / ins.nights.length : 1;
   areas.push({ id: 'netter', label: 'Overnatting', score: nScore, status: nIssues.length ? (chosen ? 'obs' : 'mangler') : 'ok', detail: `${chosen}/${ins.nights.length} netter valgt${o.campCount ? '' : ' · ingen steder lagt inn'}`, todo: nIssues.slice(0, 4).map((t) => ({ text: t, tab: 'netter' })) });
-  void need;
   // rute og sikkerhet
   const rScore = o.importantWarnings ? 0.4 : o.waterChecked ? 1 : 0.7;
   areas.push({ id: 'rute', label: 'Rute og sikkerhet', score: rScore, status: o.importantWarnings ? 'mangler' : o.waterChecked ? 'ok' : 'obs', detail: `${o.importantWarnings} viktige varsler ikke vurdert${o.waterChecked ? '' : ' · vann ikke kontrollert mot NVE'}`, todo: [...(o.importantWarnings ? [{ text: `${o.importantWarnings} viktige varsler å vurdere`, tab: 'oversikt' as Tab }] : []), ...(o.waterChecked ? [] : [{ text: 'Kontroller vann langs ruten (NVE)', tab: 'oversikt' as Tab }])] });
