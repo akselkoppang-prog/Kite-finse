@@ -43,7 +43,7 @@ export default function DayPlanPage() {
   const [dragD, setDragD] = useState<number | null>(null);
   const sc = s.scenarios.find((x) => x.id === s.scenarioId)!;
   const places = Object.values(s.places);
-  const wps = route?.waypoints ?? [];
+  const wps = useMemo(() => route?.waypoints ?? [], [route]);
   const cum = useMemo(() => cumulative(wps), [wps]);
 
   const checkpoints = useMemo(() => {

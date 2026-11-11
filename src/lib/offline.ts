@@ -16,7 +16,7 @@ export function cachedTileLayer(url: string, opts: L.TileLayerOptions) {
 
 export function registerSW() {
   if (!('serviceWorker' in navigator)) return;
-  if (location.hostname === 'localhost' && location.port === '5173') return; // ikke i dev-server
+  if (import.meta.env?.DEV) return; // aldri i utviklingsserveren (ville lagret utviklingsfiler)
   navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW-registrering feilet', e));
 }
 

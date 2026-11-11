@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { safeUrl } from '../lib/html';
 import * as turf from '@turf/turf';
 import { useStore } from '../state/store';
 import { useActiveRoute, useBarrierCheck } from '../state/derived';
@@ -211,7 +212,7 @@ export function OverrideRow({ o }: { o: LakeOverride }) {
         {' · '}lagt til {o.createdAt.slice(0, 10)}
       </div>
       <div className="small">📝 {o.note}</div>
-      {o.sourceLink && <div className="small">🔗 <a href={o.sourceLink} target="_blank" rel="noreferrer">{o.sourceLink}</a></div>}
+      {o.sourceLink && <div className="small">🔗 {safeUrl(o.sourceLink) ? <a href={safeUrl(o.sourceLink)} target="_blank" rel="noreferrer">{o.sourceLink}</a> : o.sourceLink}</div>}
       {reviewPending(o) && <div className="small warn">Krever gjennomgang før avreise</div>}
       {o.reviewedAt && <div className="small muted">Gjennomgått {o.reviewedAt.slice(0, 10)}</div>}
       <div className="btns">

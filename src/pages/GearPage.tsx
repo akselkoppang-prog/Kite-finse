@@ -10,6 +10,7 @@ import { cachedTileCount, clearTiles, corridorTiles, prefetchTiles } from '../li
 import { SOURCES } from '../data/sources';
 import { fmtClock } from '../lib/sun';
 import { Card, Progress } from '../components/ui';
+import { escHtml } from '../lib/html';
 import GearPlanner from '../components/plan/GearPlanner';
 
 export default function GearPage() {
@@ -32,17 +33,17 @@ export default function GearPage() {
   const printOverview = () => {
     const w = window.open('', '_blank');
     if (!w) return;
-    const esc = (t: string) => t.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]!);
-    const rows = plan.days.map((d) => `<tr><td>${d.day}</td><td>${d.date}</td><td>${fmtKm(d.d1 - d.d0)}</td><td>${d.totalH.toFixed(1)} t</td><td>${fmtClock(d.sun.sunrise)}–${fmtClock(d.sun.sunset)}</td><td>${esc(s.dayNotes[`${route?.id}:${d.day}`] ?? '')}</td></tr>`).join('');
-    const wps = (route?.waypoints ?? []).filter((x) => x.name || x.category || x.description).map((x) => `<tr><td>${esc(x.name ?? '')}</td><td>${fmtCoord(x)}</td><td>${esc(x.category ?? '')}</td><td>${esc(x.description ?? '')} ${esc(x.notes ?? '')}</td><td>${x.verification ?? 'uverifisert'}</td></tr>`).join('');
-    const mks = s.markers.map((x) => `<tr><td>${esc(x.name)}</td><td>${fmtCoord(x)}</td><td>${esc(x.category)}</td><td>${esc(x.description ?? '')} ${esc(x.notes ?? '')}</td><td>${x.verification ?? 'uverifisert'}</td></tr>`).join('');
-    w.document.write(`<!doctype html><meta charset="utf-8"><title>${s.project.name} ${s.tripDate}</title><style>body{font:12px system-ui;margin:16px}table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #999;padding:3px 5px;text-align:left}h1{font-size:18px}</style>
-      <h1>${s.project.name} · ${s.tripDate} · ${s.tripDays} dager</h1>
+    const esc = escHtml;
+    const rows = plan.days.map((d) => `<tr><td>${d.day}</td><td>${esc(d.date)}</td><td>${fmtKm(d.d1 - d.d0)}</td><td>${d.totalH.toFixed(1)} t</td><td>${fmtClock(d.sun.sunrise)}–${fmtClock(d.sun.sunset)}</td><td>${esc(s.dayNotes[`${route?.id}:${d.day}`] ?? '')}</td></tr>`).join('');
+    const wps = (route?.waypoints ?? []).filter((x) => x.name || x.category || x.description).map((x) => `<tr><td>${esc(x.name ?? '')}</td><td>${fmtCoord(x)}</td><td>${esc(x.category ?? '')}</td><td>${esc(x.description ?? '')} ${esc(x.notes ?? '')}</td><td>${esc(x.verification ?? 'uverifisert')}</td></tr>`).join('');
+    const mks = s.markers.map((x) => `<tr><td>${esc(x.name)}</td><td>${fmtCoord(x)}</td><td>${esc(x.category)}</td><td>${esc(x.description ?? '')} ${esc(x.notes ?? '')}</td><td>${esc(x.verification ?? 'uverifisert')}</td></tr>`).join('');
+    w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(s.project.name)} ${esc(s.tripDate)}</title><style>body{font:12px system-ui;margin:16px}table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #999;padding:3px 5px;text-align:left}h1{font-size:18px}</style>
+      <h1>${esc(s.project.name)} · ${esc(s.tripDate)} · ${esc(s.tripDays)} dager</h1>
       <p>Rute: ${esc(route?.name ?? '')} · ${fmtKm(stats.total)} · ↑${Math.round(stats.up)} m ↓${Math.round(stats.down)} m · Quiver: ${esc(KITES.filter((k) => quiver?.kiteIds.includes(k.id)).map((k) => `${k.size} m² ${k.name}`).join(', '))}</p>
       <p><b>FORESLÅTT RUTE – ikke verifisert i terrenget. Brukergodkjent ≠ verifisert.</b></p>
       <h2>Dager</h2><table><tr><th>Dag</th><th>Dato</th><th>Distanse</th><th>Est. tid</th><th>Sol</th><th>Notater</th></tr>${rows}</table>
       <h2>Sjekkpunkter</h2><table><tr><th>Navn</th><th>Koordinater</th><th>Kategori</th><th>Notat</th><th>Status</th></tr>${wps}${mks}</table>
-      <h2>Vann-overstyringer</h2><ul>${s.lakeOverrides.filter((o) => o.active).map((o) => `<li>${esc(o.name)} – ${esc(o.note)} (${o.scope}${o.expires ? `, utløper ${o.expires}` : ''})</li>`).join('') || '<li>Ingen</li>'}</ul>
+      <h2>Vann-overstyringer</h2><ul>${s.lakeOverrides.filter((o) => o.active).map((o) => `<li>${esc(o.name)} – ${esc(o.note)} (${esc(o.scope)}${o.expires ? `, utløper ${esc(o.expires)}` : ''})</li>`).join('') || '<li>Ingen</li>'}</ul>
       <script>setTimeout(()=>print(),300)</script>`);
     w.document.close();
   };

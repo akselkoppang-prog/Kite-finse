@@ -26,7 +26,7 @@ export async function createBackup(reason: string, auto: boolean, keep = false, 
   const rec: BackupRec = { id: uid('bk'), projectId, createdAt: new Date().toISOString(), reason, size: new Blob([txt]).size, data: txt, auto, keep };
   await db.put('backups', rec);
   await setMeta(`lastBackup:${projectId}`, rec.createdAt);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const ps = (await import('./persistence')).useSave.getState();
   ps.set({ lastBackupAt: rec.createdAt });
   return rec;

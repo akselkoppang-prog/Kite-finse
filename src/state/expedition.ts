@@ -43,7 +43,7 @@ function useScenarioRouteSync() {
     if (st.plans.some((p) => !p.tripDate)) st.set({ plans: st.plans.map((p) => (p.tripDate ? p : { ...p, tripDate: st.tripDate })) });
     const p = useStore.getState().plans.find((x) => x.id === activePlanId);
     if (p?.tripDate && p.tripDate !== useStore.getState().tripDate) useStore.getState().set({ tripDate: p.tripDate });
-  }, [activePlanId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activePlanId]);  
   useEffect(() => {
     const st = useStore.getState();
     const p = st.plans.find((x) => x.id === st.activePlanId);
@@ -54,7 +54,7 @@ function useScenarioRouteSync() {
     const st = useStore.getState();
     const p = st.plans.find((x) => x.id === activePlanId);
     if (p?.routeId && p.routeId !== st.activeRouteId && st.routes.some((r) => r.id === p.routeId)) st.set({ activeRouteId: p.routeId });
-  }, [activePlanId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activePlanId]);  
   useEffect(() => {
     const st = useStore.getState();
     const p = st.plans.find((x) => x.id === st.activePlanId);

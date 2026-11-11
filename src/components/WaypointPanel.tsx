@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { safeUrl } from '../lib/html';
 import { useStore } from '../state/store';
 import { useActiveRoute, useDayPlan } from '../state/derived';
 import { allCategories, categoryOf, VERIFICATION_TEXT } from '../data/categories';
@@ -97,7 +98,7 @@ export default function WaypointPanel({ kind, id }: { kind: 'wp' | 'marker'; id:
         <div className="attach">
           {(item.attachments ?? []).map((a) => (
             <div key={a.id} className="att">
-              {a.kind === 'bilde' ? <AttachmentImg a={a} /> : <a href={a.href} target="_blank" rel="noreferrer">🔗 {a.name}</a>}
+              {a.kind === 'bilde' ? <AttachmentImg a={a} /> : (safeUrl(a.href) ? <a href={safeUrl(a.href)} target="_blank" rel="noreferrer">🔗 {a.name}</a> : <span title="Ugyldig lenke (bare http/https)">🔗 {a.name}</span>)}
               <button className="link danger" onClick={() => { patch({ attachments: (item.attachments ?? []).filter((x) => x.id !== a.id) }); if (a.blobId) void releaseImage(a.blobId); }}>fjern</button>
             </div>
           ))}

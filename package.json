@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
+    "lint": "eslint src tests/*.ts",
     "test": "esbuild tests/logic.test.ts --bundle --platform=node --outfile=node_modules/.cache/logic.test.cjs --log-level=warning && esbuild tests/sim.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/sim.test.mjs --log-level=warning && TZ=Europe/Oslo node node_modules/.cache/logic.test.cjs && TZ=Europe/Oslo node node_modules/.cache/sim.test.mjs && esbuild tests/storage.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/storage.test.mjs --log-level=warning && node node_modules/.cache/storage.test.mjs && esbuild tests/export.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/export.test.mjs --log-level=warning && TZ=Europe/Oslo node node_modules/.cache/export.test.mjs && esbuild tests/plan.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/plan.test.mjs --log-level=warning && TZ=Europe/Oslo node node_modules/.cache/plan.test.mjs"
   },
   "dependencies": {
@@ -24,13 +25,18 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/leaflet": "1.9",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@types/suncalc": "^1.9.2",
     "@vitejs/plugin-react": "^4.7.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "fake-indexeddb": "^6.2.7",
+    "globals": "^17.14.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.2",
     "vite": "^5.4.21"
   }
 }

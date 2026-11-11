@@ -66,7 +66,7 @@ export function SaveBanners() {
 export function AttachmentImg({ a, full = false }: { a: Attachment; full?: boolean }) {
   const url = useBlobUrl(full ? a.blobId : a.thumbId ?? a.blobId);
   const full_ = useBlobUrl(a.blobId);
-  const src = url ?? (a.href?.startsWith('data:') ? a.href : null);
+  const src = url ?? (a.href?.startsWith('data:image/') ? a.href : null);
   if (!src) return <span className="muted small">bilde mangler</span>;
   return (
     <a href={full_ ?? src} target="_blank" rel="noreferrer" title={`${a.name}${a.size ? ` · ${(a.size / 1024).toFixed(0)} kB` : ''}`}>

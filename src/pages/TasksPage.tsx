@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { safeUrl } from '../lib/html';
 import { useStore } from '../state/store';
 import { gearListOf } from '../lib/plan/context';
 import { uid } from '../lib/geo';
@@ -140,7 +141,7 @@ export default function TasksPage() {
       </Card>
 
       <Card title="Dokumenter og lenker">
-        {st.documents.map((d) => <div key={d.id} className="row small"><a href={d.url} target="_blank" rel="noreferrer">{d.name}</a> <span className="muted">{d.note}</span> <button className="link danger" onClick={() => st.set({ documents: st.documents.filter((x) => x.id !== d.id) })}>✕</button></div>)}
+        {st.documents.map((d) => <div key={d.id} className="row small">{safeUrl(d.url) ? <a href={safeUrl(d.url)} target="_blank" rel="noreferrer">{d.name}</a> : <span>{d.name}</span>} <span className="muted">{d.note}</span> <button className="link danger" onClick={() => st.set({ documents: st.documents.filter((x) => x.id !== d.id) })}>✕</button></div>)}
         <DocAdd />
         <p className="small muted">Personlige notater og kontakter ligger under Prosjekt.</p>
       </Card>

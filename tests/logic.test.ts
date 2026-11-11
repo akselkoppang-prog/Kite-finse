@@ -56,7 +56,7 @@ const pts = [...gpx.matchAll(/lat="([\d.]+)" lon="([\d.]+)">\s*<ele>([\d.]+)/g)]
 const total = totalLength(pts);
 const legs = windLegs(pts, 'NV', 500);
 const ds = densify(pts, 100); const cum = cumulative(pts);
-const zAt = (p: { d: number }) => { let i = cum.findIndex((c) => c >= p.d); if (i <= 0) return pts[0].ele; const t = (p.d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1); return pts[i - 1].ele + (pts[i].ele - pts[i - 1].ele) * t; };
+const zAt = (p: { d: number }) => { const i = cum.findIndex((c) => c >= p.d); if (i <= 0) return pts[0].ele; const t = (p.d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1); return pts[i - 1].ele + (pts[i].ele - pts[i - 1].ele) * t; };
 const desc = finalDescent(pts, zAt);
 console.log('Nedstigning', desc && { fra: (desc.fromD / 1000).toFixed(1), til: (desc.toD / 1000).toFixed(1), fall: Math.round(desc.drop) }, 'samples', ds.length);
 ok(!!desc && desc.drop > 500 && desc.toD - desc.fromD < 8000, 'sluttnedstigning funnet (>500 m fall, <8 km)');
@@ -64,7 +64,7 @@ const walk: [number, number][] = desc ? [[desc.fromD, desc.toD]] : [];
 for (const sc of DEFAULT_SCENARIOS) {
   const lt = legTimes(legs, DEFAULT_PARAMS, sc, walk, 1);
   const n = daysNeeded(lt, DEFAULT_PARAMS, sc, () => 11);
-  const days = [0, ...equalBreaks(total, 3), total].slice(0, -1).map((d0, i, a) => dayTotals(lt, d0, i < 2 ? equalBreaks(total, 3)[i] : total, i + 1, DEFAULT_PARAMS, sc));
+  const days = [0, ...equalBreaks(total, 3), total].slice(0, -1).map((d0, i) => dayTotals(lt, d0, i < 2 ? equalBreaks(total, 3)[i] : total, i + 1, DEFAULT_PARAMS, sc));
   console.log(`Scenario ${sc.id}: ${n.days} reisedager (+${sc.restDays} hvile); 3-dagers fordeling timer:`, days.map((d) => `${d.totalH.toFixed(1)}t (kite ${d.kiteH.toFixed(1)}, ski ${d.skiH.toFixed(1)})`).join(' | '));
   if (sc.id === 'A') ok(n.days <= 3, 'Scenario A: tre dager mulig med NV-vind');
   if (sc.id === 'C') ok(n.days > 3, 'Scenario C: mer enn tre dager');

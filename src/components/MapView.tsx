@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { escHtml, numHtml, safeColor } from '../lib/html';
 import { useStore } from '../state/store';
 import { useActiveRoute, useBarrierCheck, useTerrain, useWind } from '../state/derived';
 import { useExpedition, updateDay } from '../state/expedition';
@@ -19,7 +20,7 @@ export const STATUS_COLOR = { GRØNN: '#22c55e', GUL: '#eab308', RØD: '#ef4444'
 export const ROUTE_RED = '#ef4444';
 export const ALT_BLUE = '#3b82f6';
 
-const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]!);
+const esc = escHtml;
 
 export default function MapView() {
   const el = useRef<HTMLDivElement>(null);
@@ -260,7 +261,7 @@ export default function MapView() {
       let size: number;
       if (cat) {
         size = 26;
-        html = `<div class="catpin ${sel ? 'sel' : ''} ${approved ? 'approved' : ''}" style="border-color:${cat.color}">${cat.icon}</div>${named ? `<div class="wplabel">${esc(w.name!)}</div>` : ''}`;
+        html = `<div class="catpin ${sel ? 'sel' : ''} ${approved ? 'approved' : ''}" style="border-color:${safeColor(cat.color)}">${esc(cat.icon)}</div>${named ? `<div class="wplabel">${esc(w.name!)}</div>` : ''}`;
       } else {
         size = named || isEnd ? 14 : many ? 7 : 10;
         html = `<div class="wp ${w.kind} ${sel ? 'sel' : ''} ${approved ? 'approved' : ''} ${w.dataKind}" style="width:${size}px;height:${size}px;border-color:${ROUTE_RED}"></div>${named ? `<div class="wplabel">${esc(w.name!)}</div>` : ''}`;
@@ -295,7 +296,7 @@ export default function MapView() {
       const cat = categoryOf(m.category, s.customCategories);
       if (s.hiddenCategories.includes(m.category)) return;
       const approved = m.verification === 'brukergodkjent';
-      const html = `<div class="catpin marker ${s.selectedMarker === m.id ? 'sel' : ''} ${approved ? 'approved' : ''}" style="border-color:${cat?.color ?? '#a855f7'}">${cat?.icon ?? '📝'}</div><div class="wplabel">${esc(m.name)}</div>`;
+      const html = `<div class="catpin marker ${s.selectedMarker === m.id ? 'sel' : ''} ${approved ? 'approved' : ''}" style="border-color:${safeColor(cat?.color)}">${esc(cat?.icon ?? '📝')}</div><div class="wplabel">${esc(m.name)}</div>`;
       const mk = L.marker([m.lat, m.lon], { draggable: true, icon: L.divIcon({ className: '', html, iconSize: [26, 26], iconAnchor: [13, 13] }) });
       mk.on('dragend', () => {
         const ll = mk.getLatLng();
@@ -329,8 +330,8 @@ export default function MapView() {
       // vindpil for dagen (ditt scenario) midt på strekningen
       const mid = pointAt(route.waypoints, cum, (d.startD + d.endD) / 2);
       const w = exp.plan.days[i]?.wind;
-      if (w) L.marker([mid.lat, mid.lon], { interactive: true, icon: L.divIcon({ className: '', html: `<div class="daywind" style="border-color:${color}"><span style="transform:rotate(${(w.dir + 180) % 360 - 90}deg)">➤</span><b>${w.avg}</b></div>`, iconSize: [42, 42], iconAnchor: [21, 21] }) })
-        .bindTooltip(`Dag ${d.day}: vind fra ${Math.round(w.dir)}°, ${w.avg} m/s (${w.min}–${w.max}, kast ${w.gust}) – ${exp.plan.days[i].windMode === 'manuell' ? 'ditt scenario, ikke prognose' : 'værmelding'}`)
+      if (w) L.marker([mid.lat, mid.lon], { interactive: true, icon: L.divIcon({ className: '', html: `<div class="daywind" style="border-color:${color}"><span style="transform:rotate(${(w.dir + 180) % 360 - 90}deg)">➤</span><b>${numHtml(w.avg)}</b></div>`, iconSize: [42, 42], iconAnchor: [21, 21] }) })
+        .bindTooltip(`Dag ${d.day}: vind fra ${numHtml(Math.round(w.dir))}°, ${numHtml(w.avg)} m/s (${numHtml(w.min)}–${numHtml(w.max)}, kast ${numHtml(w.gust)}) – ${exp.plan.days[i].windMode === 'manuell' ? 'ditt scenario, ikke prognose' : 'værmelding'}`)
         .addTo(g);
       const last = i === exp.days.length - 1 && d.remainingKm <= 0.05;
       if (last) return;
@@ -352,7 +353,7 @@ export default function MapView() {
     if (!s.layers.windColor) return;
     wind.legs.forEach((l) => {
       L.polyline([[l.from.lat, l.from.lon], [l.to.lat, l.to.lon]], { color: scoreColor(l.score), weight: 9, opacity: 0.85 })
-        .bindTooltip(`${l.courseText}<br/>Kurs ${Math.round(l.heading)}°, ${Math.round(l.angle)}° fra vind ${s.windFrom}<br/>${l.notes.join('<br/>')}<br/><i>Beregnet – ikke observasjon</i>`, { sticky: true })
+        .bindTooltip(`${esc(l.courseText)}<br/>Kurs ${Math.round(l.heading)}°, ${Math.round(l.angle)}° fra vind ${esc(s.windFrom)}<br/>${l.notes.map(esc).join('<br/>')}<br/><i>Beregnet – ikke observasjon</i>`, { sticky: true })
         .addTo(g);
     });
   }, [wind, s.layers.windColor, s.windFrom]);
@@ -369,7 +370,7 @@ export default function MapView() {
       const to = (row.windFrom + 180) % 360;
       const html = `<div class="windarrow"><div class="arr" style="transform:rotate(${to}deg)">➤</div><div class="wlbl">${row.windSpeed?.toFixed(0) ?? '–'}<small>/${row.windGust?.toFixed(0) ?? '–'}</small></div></div>`;
       L.marker([wp.lat, wp.lon], { icon: L.divIcon({ className: '', html, iconSize: [44, 44], iconAnchor: [22, 22] }), interactive: true })
-        .bindTooltip(`<b>${esc(wp.label)}</b><br/>${new Date(row.time).toLocaleString('nb-NO', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}<br/>Vind ${row.windSpeed} m/s (kast ${row.windGust ?? '–'}) fra ${Math.round(row.windFrom)}°<br/>${row.temp}°C<br/><i>MET-prognose for punktet (modellgitter) – ikke måling</i>`)
+        .bindTooltip(`<b>${esc(wp.label)}</b><br/>${new Date(row.time).toLocaleString('nb-NO', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}<br/>Vind ${numHtml(row.windSpeed)} m/s (kast ${numHtml(row.windGust)}) fra ${numHtml(Math.round(row.windFrom))}°<br/>${numHtml(row.temp)}°C<br/><i>MET-prognose for punktet (modellgitter) – ikke måling</i>`)
         .addTo(g);
     });
   }, [s.windPoints, s.forecastHour, s.layers.windArrows]);
@@ -399,7 +400,7 @@ export default function MapView() {
     check.crossings.forEach((c) => {
       const color = c.blocking ? '#ff0040' : c.label === 'BRUKERGODKJENT' ? STATUS_COLOR.BRUKER : '#eab308';
       L.polyline([[c.entry.lat, c.entry.lon], [c.exit.lat, c.exit.lon]], { color, weight: 10, opacity: 0.9 })
-        .bindTooltip(`${c.label}: ${esc(c.barrier.name)} (${Math.round(c.lengthM)} m)<br/>${esc(c.barrier.label)}${c.hazards.length ? `<br/>⚠️ ${esc(c.hazards.join('; '))}` : ''}`, { sticky: true })
+        .bindTooltip(`${esc(c.label)}: ${esc(c.barrier.name)} (${Math.round(c.lengthM)} m)<br/>${esc(c.barrier.label)}${c.hazards.length ? `<br/>⚠️ ${esc(c.hazards.join('; '))}` : ''}`, { sticky: true })
         .on('click', (e) => {
           L.DomEvent.stopPropagation(e);
           useStore.getState().set({ selectedBarrier: c.barrier.id, selectedWp: null, selectedMarker: null });
@@ -408,7 +409,7 @@ export default function MapView() {
     });
     check.bandWarnings.forEach((w) => {
       L.circleMarker([w.wp.lat, w.wp.lon], { radius: 11, color: '#ff0040', weight: 3, fill: false, dashArray: '3 3' })
-        .bindTooltip(`GPX-høyde ${Math.round(w.wp.eleGpx!)} moh er innenfor reguleringsintervallet til ${esc(w.water)} (${w.band}).<br/>Indikasjon på at punktet ligger PÅ magasinet – kontroller.`)
+        .bindTooltip(`GPX-høyde ${Math.round(w.wp.eleGpx!)} moh er innenfor reguleringsintervallet til ${esc(w.water)} (${esc(w.band)}).<br/>Indikasjon på at punktet ligger PÅ magasinet – kontroller.`)
         .addTo(g);
     });
   }, [check.crossings, check.bandWarnings]);
@@ -422,7 +423,7 @@ export default function MapView() {
     Object.values(s.places).forEach((p) => {
       const emoji = p.role.includes('hytte') ? '🛖' : p.role.includes('transport') ? '🚉' : '📍';
       L.marker([p.lat, p.lon], { icon: L.divIcon({ className: '', html: `<div class="place">${emoji}<span>${esc(p.name)}</span></div>`, iconSize: [20, 20], iconAnchor: [10, 10] }) })
-        .bindPopup(`<b>${esc(p.name)}</b> (${esc(p.type)})<br/>${esc(p.kommune ?? '')}<br/>${fmtCoord(p)}<br/><small>Kilde: ${esc(p.source)}, hentet ${p.fetchedAt.slice(0, 10)}.<br/>Åpningstider/tilgang IKKE kontrollert – sjekk ut.no.</small>`)
+        .bindPopup(`<b>${esc(p.name)}</b> (${esc(p.type)})<br/>${esc(p.kommune ?? '')}<br/>${fmtCoord(p)}<br/><small>Kilde: ${esc(p.source)}, hentet ${esc(String(p.fetchedAt ?? '').slice(0, 10))}.<br/>Åpningstider/tilgang IKKE kontrollert – sjekk ut.no.</small>`)
         .addTo(g);
     });
   }, [s.places, s.layers.places]);
@@ -440,7 +441,7 @@ export default function MapView() {
       const ni = plan ? plan.days.findIndex((d) => d.campId === c.id) : -1;
       const other = !!c.scenarioIds?.length && !c.scenarioIds.includes(s.activePlanId);
       const lbl = ni >= 0 ? `N${ni + 1}★` : other ? 'annet scen.' : '';
-      const mk = L.marker([c.lat, c.lon], { draggable: true, opacity: other ? 0.45 : 1, icon: L.divIcon({ className: '', html: `<div class="camp ${c.approved ? 'approved' : ''} ${ni >= 0 ? 'pref' : ''}">${ICON[c.kind ?? 'telt']}<span>${lbl}${c.capacity != null ? ` ${c.capacity}p` : ''}${c.resupply ? ' 🥫' : ''}${c.approved ? ' ✓' : ''}</span></div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) });
+      const mk = L.marker([c.lat, c.lon], { draggable: true, opacity: other ? 0.45 : 1, icon: L.divIcon({ className: '', html: `<div class="camp ${c.approved ? 'approved' : ''} ${ni >= 0 ? 'pref' : ''}">${ICON[c.kind ?? 'telt'] ?? '📍'}<span>${lbl}${c.capacity != null ? ` ${numHtml(c.capacity)}p` : ''}${c.resupply ? ' 🥫' : ''}${c.approved ? ' ✓' : ''}</span></div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) });
       mk.on('dragend', () => {
         const ll = mk.getLatLng();
         const st = useStore.getState();
@@ -450,7 +451,7 @@ export default function MapView() {
         L.DomEvent.stopPropagation(e);
         useStore.getState().set({ selectedCamp: c.id, selectedWp: null, selectedMarker: null, selectedBarrier: null });
       });
-      mk.bindTooltip(`${esc(c.name)} – natt ${c.night}${c.role ? ` (${c.role})` : ''} · ${c.source}. ${c.approved ? 'Brukergodkjent (ikke befart av verktøyet).' : 'IKKE befart.'} Klikk for å redigere.`).addTo(g);
+      mk.bindTooltip(`${esc(c.name)} – natt ${numHtml(c.night)}${c.role ? ` (${esc(c.role)})` : ''} · ${esc(c.source)}. ${c.approved ? 'Brukergodkjent (ikke befart av verktøyet).' : 'IKKE befart.'} Klikk for å redigere.`).addTo(g);
     });
   }, [s.camps, s.layers.camps, s.plans, s.activePlanId]);
 
@@ -468,7 +469,7 @@ export default function MapView() {
         st.set({ crossings: st.crossings.map((x) => (x.id === c.id ? { ...x, lat: ll.lat, lon: ll.lng } : x)) });
       });
       mk.on('click', (e) => { L.DomEvent.stopPropagation(e); useStore.getState().set({ tab: 'netter' }); });
-      mk.bindTooltip(`${esc(c.name)} – ${c.kind}: ${c.schedule ? `avganger ${esc(c.schedule)}` : `venting ${c.waitMin} min`}, overgang ${c.transferMin} min${c.source ? '' : ' (ikke bekreftet)'}. Klikk for å redigere.`).addTo(g);
+      mk.bindTooltip(`${esc(c.name)} – ${esc(c.kind)}: ${c.schedule ? `avganger ${esc(c.schedule)}` : `venting ${numHtml(c.waitMin)} min`}, overgang ${numHtml(c.transferMin)} min${c.source ? '' : ' (ikke bekreftet)'}. Klikk for å redigere.`).addTo(g);
     });
   }, [s.crossings]);
 

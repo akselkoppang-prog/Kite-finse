@@ -49,7 +49,7 @@ export default function DayCard({ i, day, out, forecastAvailable }: { i: number;
   const done = out.reason.startsWith('allerede');
   const maxKm = Math.max(5, Math.ceil((out.remainingKm + out.progressKm)));
 
-  const useCamp = (id: string, d: number) => {
+  const pickCamp = (id: string, d: number) => {
     s.set({ camps: s.camps.map((c) => (c.id === id ? { ...c, night: i + 1, role: 'foretrukket' } : c.night === i + 1 && c.role === 'foretrukket' ? { ...c, role: 'reserve' } : c)) });
     set({ campId: id, target: { mode: 'stopp', stopD: d } });
   };
@@ -144,7 +144,7 @@ export default function DayCard({ i, day, out, forecastAvailable }: { i: number;
           {chosen && <div className="small">⛺ <b>{chosen.name}</b> {chosen.description && `– ${chosen.description}`} <button className="link" onClick={() => s.set({ selectedCamp: chosen.id, tab: 'oversikt' })}>rediger</button></div>}
           <div className="campchoices">
             {camps.filter((x) => x.c.id !== day.campId).slice(0, 4).map(({ c, dist, d }) => (
-              <button key={c.id} className="btn small ghost" onClick={() => useCamp(c.id, d)}>⛺ {c.name} <span className="muted">{(dist / 1000).toFixed(1)} km fra sluttpunkt</span></button>
+              <button key={c.id} className="btn small ghost" onClick={() => pickCamp(c.id, d)}>⛺ {c.name} <span className="muted">{(dist / 1000).toFixed(1)} km fra sluttpunkt</span></button>
             ))}
             <button className="btn small" onClick={() => addCampAt(endP.lat, endP.lon, out.endD, `Leir dag ${i + 1}`)}>+ Teltplass ved sluttpunktet</button>
           </div>

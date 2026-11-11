@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { cumulative, pointAt } from '../lib/geo';
+import { escHtml } from '../lib/html';
 import { SCENARIO_COLORS } from '../lib/plan/compare';
 import { hhmm } from '../lib/sim/expedition';
 import type { PlanRun } from '../lib/plan/context';
@@ -34,14 +35,14 @@ export default function ScenarioMap({ runs }: { runs: PlanRun[] }) {
       const color = SCENARIO_COLORS[i % SCENARIO_COLORS.length];
       const ll = r.route.waypoints.map((w) => [w.lat, w.lon] as [number, number]);
       // litt forskjøvet strektykkelse så like ruter fortsatt synes
-      L.polyline(ll, { color, weight: 7 - Math.min(4, i * 1.5), opacity: 0.85 }).bindTooltip(r.plan.name).addTo(g);
+      L.polyline(ll, { color, weight: 7 - Math.min(4, i * 1.5), opacity: 0.85 }).bindTooltip(escHtml(r.plan.name)).addTo(g);
       ll.forEach((p) => bounds.extend(p));
       const cum = cumulative(r.route.waypoints);
       r.days.forEach((d) => {
         if (d.reason.startsWith('allerede')) return;
         const p = pointAt(r.route!.waypoints, cum, d.endD);
         L.circleMarker([p.lat, p.lon], { radius: 7, color: '#0b1220', weight: 2, fillColor: color, fillOpacity: 1 })
-          .bindTooltip(`${r.plan.name} · dag ${d.day}: ${((d.endD - d.startD) / 1000).toFixed(0)} km, ankomst ${hhmm(d.arrival)}`)
+          .bindTooltip(`${escHtml(r.plan.name)} · dag ${d.day}: ${((d.endD - d.startD) / 1000).toFixed(0)} km, ankomst ${hhmm(d.arrival)}`)
           .addTo(g);
       });
     });
