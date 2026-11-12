@@ -9,3 +9,4 @@ version.json
 .version-state.json
 .version.lock
 undefined/
+tests/e2e/site/
