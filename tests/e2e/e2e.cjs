@@ -168,7 +168,7 @@ const state = async (p) => {
   await go(p, 'Kart & rute'); await p.waitForTimeout(400);
   await p.setInputFiles('input[type=file][accept*=".gpx"]', gpxPath); await p.waitForTimeout(800);
   const after = await state(p);
-  ok(after.routes.length > before.routes.length && after.markers.length > before.markers.length && after.routes.find((x) => x.id === 'gpx-original').waypoints[0].category === 'launch' && after.markers.some((m) => m.category === 'launch'), 'GPX-import legger til uten å fjerne eksisterende data, kategori bevart');
+  ok(after.routes.length > before.routes.length && after.markers.length > before.markers.length && after.routes.find((x) => x.id === 'gpx-original').waypoints[0].category === 'launch' && after.routes.filter((x) => !before.routes.some((y) => y.id === x.id)).some((r) => r.waypoints[0].category === 'launch'), 'GPX-import legger til uten å fjerne eksisterende data, kategori bevart (på rutepunktet, ikke som ekstra markør)');
   await go(p, 'Utstyr & offline'); await p.waitForTimeout(300);
   const [dj] = await Promise.all([p.waitForEvent('download'), p.click('button:has-text("Last ned hele prosjektet")')]);
   const jp = dir + '/proj.zip'; await dj.saveAs(jp);
