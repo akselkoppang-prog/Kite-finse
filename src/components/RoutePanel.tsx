@@ -4,7 +4,8 @@ import { useActiveRoute, useBarrierCheck, useProfile, useTerrain } from '../stat
 import { buildChainRoutes, checkLakesForActive, importGpxFile, loadHydro, resolveAllPlaces, runTerrainForActive } from '../lib/actions';
 import { exportZip, importProject } from '../storage/archive';
 import { useSave, flush, switchProject } from '../storage/persistence';
-import { download, toGpx } from '../lib/gpx';
+import { download, routeProblem, toGpx } from '../lib/gpx';
+import { editRoute, startNewRoute } from '../lib/route/builder';
 import { detourAround } from '../lib/analysis/barriers';
 import { Badge, Card, Progress, fmtTime } from './ui';
 import { fmtKm, uid } from '../lib/geo';
@@ -31,7 +32,7 @@ export default function RoutePanel() {
       const r = await fn();
       if (r) setMsg(r);
     } catch (e) {
-      setMsg(`❌ ${label}: ${(e as Error).message}. Tjenesten kan være utilgjengelig, blokkert av CORS eller ha endret adresse – se Datakilder.`);
+      setMsg(label === 'GPX-eksport' || label === 'GPX-import' ? `❌ ${label}: ${(e as Error).message}` : `❌ ${label}: ${(e as Error).message}. Tjenesten kan være utilgjengelig, blokkert av CORS eller ha endret adresse – se Datakilder.`);
     } finally {
       setBusy(null);
     }
@@ -53,9 +54,13 @@ export default function RoutePanel() {
           ))}
         </div>
         <div className="btns">
+          <button className="btn primary" id="rp-new" onClick={startNewRoute}>＋ Ny rute</button>
+          <button className="btn" id="rp-edit" disabled={!route} onClick={() => route && editRoute(route)} title="Endre start, mål, mellompunkter og navn i veiviseren">✎ Rediger start, mål og punkter</button>
+        </div>
+        <div className="btns">
           <button className="btn" onClick={() => gpxIn.current?.click()}>Importer GPX</button>
-          <button className="btn" disabled={!route} onClick={() => route && download(`${route.name.replace(/\W+/g, '_')}.gpx`, toGpx([route], s.camps, s.markers))}>Eksporter aktiv GPX</button>
-          <button className="btn" onClick={() => download('finse-rjukan-alle-ruter.gpx', toGpx(s.routes.filter((r) => r.visible), s.camps, s.markers))}>Eksporter alle</button>
+          <button className="btn" disabled={!route} onClick={() => route && run('GPX-eksport', async () => { download(`${route.name.replace(/\W+/g, '_')}.gpx`, toGpx([route], s.camps, s.markers)); })}>Eksporter aktiv GPX</button>
+          <button className="btn" onClick={() => run('GPX-eksport', async () => { const rs = s.routes.filter((r) => r.visible && !routeProblem(r)); const skipped = s.routes.filter((r) => r.visible && routeProblem(r)); download('alle-ruter.gpx', toGpx(rs, s.camps, s.markers)); return skipped.length ? `Eksportert ${rs.length} ruter. Hoppet over ${skipped.map((r) => `«${r.name}»`).join(', ')} (mangler start eller mål).` : undefined; })}>Eksporter alle</button>
           <button className="btn" disabled={!route} onClick={() => route && s.duplicateRoute(route.id)}>Dupliser til redigerbar kopi</button>
           <button className="btn danger" disabled={!route} onClick={() => route && confirm(`Slette «${route.name}»?`) && s.removeRoute(route.id)}>Slett</button>
         </div>
@@ -183,8 +188,8 @@ export default function RoutePanel() {
           {(
             [
               ['none', 'Panorer'],
-              ['add', '+ Punkt (slutt)'],
-              ['insert', '+ Punkt (sett inn)'],
+              ['add', '+ Forleng (nytt mål)'],
+              ['insert', '+ Mellompunkt'],
               ['zone', 'Tegn sone'],
               ['camp', '⛺ Teltplass'],
               ['marker', '📝 Markør'],

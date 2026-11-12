@@ -32,7 +32,7 @@ export const CACHE_KEYS = ['hydro', 'lakes', 'terrain', 'routeForecast', 'weathe
 export type CacheKey = (typeof CACHE_KEYS)[number];
 
 /** Kortvarig UI-tilstand som ikke lagres. */
-export const TRANSIENT: (keyof State)[] = ['focus', 'editMode', 'draftZone', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'selectedCamp', 'forecastHour', 'windPoints', 'simPlay', 'dailyView'];
+export const TRANSIENT: (keyof State)[] = ['focus', 'editMode', 'routeDraft', 'draftZone', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'selectedCamp', 'forecastHour', 'windPoints', 'simPlay', 'dailyView'];
 
 /** Felt som verken er lagret, cache eller kortvarig – skal alltid være tom (testes). */
 export function uncoveredKeys(state: Record<string, unknown>): string[] {

@@ -15,6 +15,8 @@ import { featureName } from '../lib/api/nve';
 import { categoryOf } from '../data/categories';
 import { cachedTileLayer } from '../lib/offline';
 import { SimLayer, DailyLayer } from './sim/SimPlayer';
+import { buildWaypoints, type DraftPt } from '../lib/route/draft';
+import { mapClick, movePoint } from '../lib/route/builder';
 
 export const STATUS_COLOR = { GRØNN: '#22c55e', GUL: '#eab308', RØD: '#ef4444', GRÅ: '#94a3b8', BRUKER: '#2dd4bf' } as const;
 export const ROUTE_RED = '#ef4444';
@@ -44,7 +46,7 @@ export default function MapView() {
     L.control.scale({ imperial: false }).addTo(m);
     map.current = m;
     setMapObj(m);
-    ['zones', 'water', 'alts', 'route', 'wind', 'steep', 'cross', 'places', 'camps', 'sub', 'markers', 'breaks', 'arrows', 'draft', 'xing'].forEach((k) => (groups.current[k] = L.layerGroup().addTo(m)));
+    ['zones', 'water', 'alts', 'route', 'wind', 'steep', 'cross', 'places', 'camps', 'sub', 'markers', 'breaks', 'arrows', 'draft', 'xing', 'rdraft'].forEach((k) => (groups.current[k] = L.layerGroup().addTo(m)));
     const coordBox = new L.Control({ position: 'bottomleft' });
     coordBox.onAdd = () => {
       const d = L.DomUtil.create('div', 'coordbox');
@@ -94,6 +96,7 @@ export default function MapView() {
       const st = useStore.getState();
       const r = st.routes.find((x) => x.id === st.activeRouteId);
       const { lat, lng } = e.latlng;
+      if (st.editMode === 'draft') { mapClick({ lat, lon: lng }); return; }
       if (st.editMode === 'none') {
         // Hurtigmeny: legg til teltplass, notat eller rutepunkt der du klikket
         const box = document.createElement('div');
@@ -247,6 +250,33 @@ export default function MapView() {
       });
   }, [s.routes, s.activeRouteId, s.layers.alternatives]);
 
+  // --- ruteveiviseren: START, MÅL, nummererte mellompunkter og linjen som blir lagret ---
+  const draft = s.routeDraft;
+  useEffect(() => {
+    const g = groups.current.rdraft;
+    if (!g) return;
+    g.clearLayers();
+    if (!draft) return;
+    const st = useStore.getState();
+    const ref = draft.geometry !== 'rett' ? st.routes.find((r) => r.id === draft.geometry) : undefined;
+    const line = buildWaypoints(draft, ref);
+    if (line.length > 1) {
+      L.polyline(line.map((w) => [w.lat, w.lon] as [number, number]), { color: '#0b1220', weight: 8, opacity: 0.6, interactive: false }).addTo(g);
+      L.polyline(line.map((w) => [w.lat, w.lon] as [number, number]), { color: '#a855f7', weight: 4, dashArray: draft.geometry === 'rett' ? '8 6' : undefined, interactive: false }).addTo(g);
+    }
+    const pin = (p: DraftPt, cls: string, label: string, title: string) => {
+      const mk = L.marker([p.lat, p.lon], { draggable: true, autoPan: true, zIndexOffset: 2000, icon: L.divIcon({ className: '', html: `<div class="dpin ${cls}">${esc(label)}</div>${p.name ? `<div class="dplabel">${esc(p.name)}</div>` : ''}`, iconSize: [30, 30], iconAnchor: [15, 15] }) });
+      mk.bindTooltip(title, { direction: 'top', offset: [0, -14] });
+      mk.on('dragend', () => { const ll = mk.getLatLng(); movePoint(p.id, { lat: ll.lat, lon: ll.lng }); });
+      mk.on('click', (e) => L.DomEvent.stopPropagation(e));
+      mk.addTo(g);
+    };
+    draft.via.forEach((v, i) => pin(v, 'dp-via', String(i + 1), `Mellompunkt ${i + 1}${v.name ? `: ${esc(v.name)}` : ''} – dra for å flytte`));
+    if (draft.start) pin(draft.start, 'dp-start', 'START', `START${draft.start.name ? `: ${esc(draft.start.name)}` : ''} – dra for å flytte`);
+    if (draft.finish) pin(draft.finish, 'dp-finish', 'MÅL', `MÅL${draft.finish.name ? `: ${esc(draft.finish.name)}` : ''} – dra for å flytte`);
+  }, [draft, s.routes]);
+
+  const drafting = !!s.routeDraft;
   // --- hovedrute (rød) + punkter ---
   useEffect(() => {
     const g = groups.current.route;
@@ -260,6 +290,8 @@ export default function MapView() {
     L.polyline(line, { color: ROUTE_RED, weight: 4, dashArray: route.kind === 'gpx' ? undefined : '10 6' })
       .bindTooltip(`Hovedrute: ${esc(route.name)} – FORESLÅTT, ikke verifisert i terrenget`, { sticky: true })
       .addTo(g);
+    // mens ruteveiviseren er åpen vises bare linjen – punktene i utkastet er de som gjelder
+    if (drafting) return;
     const many = route.waypoints.length > 60;
     // Store GPX-filer: tegn bare navngitte/kategoriserte punkter + hvert n-te som dragbare markører (ytelse)
     const stride = route.waypoints.length > 400 ? Math.ceil(route.waypoints.length / 200) : 1;
@@ -273,7 +305,11 @@ export default function MapView() {
       const approved = w.verification === 'brukergodkjent';
       let html: string;
       let size: number;
-      if (cat) {
+      if (isEnd && route.waypoints.length > 1 && !cat) {
+        size = 18;
+        const first = i === 0;
+        html = `<div class="endpin ${first ? 'ep-start' : 'ep-finish'} ${sel ? 'sel' : ''}" title="${first ? 'START' : 'MÅL'}: ${esc(w.name ?? route.name)}">${first ? 'S' : 'M'}</div><div class="eplabel ${first ? 'ep-start' : 'ep-finish'}">${first ? 'START' : 'MÅL'}${named ? ` · ${esc(w.name!)}` : ''}</div>`;
+      } else if (cat) {
         size = 26;
         html = `<div class="catpin ${sel ? 'sel' : ''} ${approved ? 'approved' : ''}" style="border-color:${safeColor(cat.color)}">${esc(cat.icon)}</div>${named ? `<div class="wplabel">${esc(w.name!)}</div>` : ''}`;
       } else {
@@ -283,6 +319,8 @@ export default function MapView() {
       const mk = L.marker([w.lat, w.lon], { icon: L.divIcon({ className: '', html, iconSize: [size, size], iconAnchor: [size / 2, size / 2] }), draggable: true, autoPan: true });
       mk.on('dragend', () => {
         const ll = mk.getLatLng();
+        // start og mål er viktige: bekreft før de flyttes (hindrer at et uhell endrer hele turen)
+        if (isEnd && !confirm(`Flytte ${i === 0 ? 'STARTEN' : 'MÅLET'} for «${route.name}» hit? Distanser, dagsetapper og vær regnes på nytt.`)) { mk.setLatLng([w.lat, w.lon]); return; }
         useStore.getState().moveWaypoint(route.id, w.id, ll.lat, ll.lng);
       });
       mk.on('click', (e) => {
@@ -298,7 +336,7 @@ export default function MapView() {
         .bindTooltip(`Delmål ${sgp.idx}: ${esc(sgp.name)} · ${(sgp.d / 1000).toFixed(1)} km`)
         .addTo(sg);
     });
-  }, [route, s.layers.routes, s.selectedWp, s.customCategories, s.hiddenCategories]);
+  }, [route, s.layers.routes, s.selectedWp, s.customCategories, s.hiddenCategories, drafting]);
 
   // --- egne markører (lilla) ---
   useEffect(() => {

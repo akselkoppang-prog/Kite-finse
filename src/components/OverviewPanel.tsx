@@ -8,6 +8,8 @@ import { TripStrip } from './plan/TripStrip';
 import Warnings from './Warnings';
 import RoutePanel from './RoutePanel';
 import { useState } from 'react';
+import { Empty } from './ux';
+import { editRoute, startNewRoute } from '../lib/route/builder';
 
 /** Prosjektnavnet – trykk ✎ for å endre det direkte her. */
 function EditableTitle() {
@@ -57,6 +59,21 @@ export default function OverviewPanel() {
         </div>
         <TripStrip days={days} total={ctx?.total ?? 1} />
         <div className="small muted">Scenario: <button className="link" onClick={() => s.setTab('scenarier')}><b>{plan.name}</b>{plan.id === s.mainPlanId ? ' ★' : ''}</button> · kites med: {s.quivers.find((q) => q.id === s.activeQuiverId)?.kiteIds.map(kiteShort).join(', ')}</div>
+      </section>
+
+      <section className="ov-route" id="ov-route">
+        {route && route.waypoints.length > 1 ? (
+          <>
+            <div className="ovr-line"><span className="dpin dp-start mini">S</span><b>{route.waypoints[0].name ?? 'Start'}</b><span className="muted">→</span><span className="dpin dp-finish mini">M</span><b>{route.waypoints[route.waypoints.length - 1].name ?? 'Mål'}</b></div>
+            <div className="small muted">Rute «{route.name}» · {(stats.total / 1000).toFixed(0)} km · {route.waypoints.length} punkter</div>
+          </>
+        ) : (
+          <Empty icon="🧭" title={route ? `Ruten «${route.name}» mangler ${route.waypoints.length ? 'mål' : 'start og mål'}` : 'Ingen rute ennå'}>Lag en rute ved å velge start og mål i kartet, eller importer en GPX-fil under «Rute og data».</Empty>
+        )}
+        <div className="btns">
+          <button className="btn small primary" onClick={startNewRoute}>＋ Ny rute</button>
+          {route && <button className="btn small" onClick={() => editRoute(route)}>✎ Rediger start, mål og punkter</button>}
+        </div>
       </section>
 
       <section className="ov-days">

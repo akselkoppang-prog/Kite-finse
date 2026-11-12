@@ -3,6 +3,7 @@ import { APP_VERSION } from '../version';
 import { cachedElevation } from '../api/kartverket';
 import { hhmm } from '../sim/expedition';
 import type { ExportSnapshot } from './snapshot';
+import { endpointWpts, routeProblem, RTE_MAX } from '../gpx';
 import type { Camp, Marker, Route, Waypoint } from '../../types';
 
 /**
@@ -19,14 +20,15 @@ const num = (n: number) => String(n); // full presisjon
 const ll = (p: LatLon) => `lat="${num(p.lat)}" lon="${num(p.lon)}"`;
 const eleOf = (w: Waypoint | GpxPt): number | undefined => ('eleGpx' in w && w.eleGpx != null ? w.eleGpx : 'ele' in w && w.ele != null ? w.ele : cachedElevation(w)?.z ?? undefined);
 
-export function buildGpx(meta: { name: string; desc?: string }, tracks: GpxTrack[], wpts: GpxWpt[]): string {
+export function buildGpx(meta: { name: string; desc?: string }, tracks: GpxTrack[], wpts: GpxWpt[], rtes: GpxTrack[] = []): string {
   const now = new Date().toISOString();
   const w = wpts.map((p) => `  <wpt ${ll(p)}>${p.ele != null ? `<ele>${p.ele.toFixed(1)}</ele>` : ''}<name>${esc(p.name)}</name>${p.cmt ? `<cmt>${esc(p.cmt)}</cmt>` : ''}${p.desc ? `<desc>${esc(p.desc)}</desc>` : ''}${p.sym ? `<sym>${esc(p.sym)}</sym>` : ''}${p.type ? `<type>${esc(p.type)}</type>` : ''}</wpt>`);
+  const r = rtes.map((rt) => `  <rte>\n    <name>${esc(rt.name)}</name>\n${rt.points.map((p) => `    <rtept ${ll(p)}>${p.ele != null ? `<ele>${p.ele.toFixed(1)}</ele>` : ''}${p.name ? `<name>${esc(p.name)}</name>` : ''}</rtept>`).join('\n')}\n  </rte>`);
   const t = tracks.map((tr) => `  <trk>\n    <name>${esc(tr.name)}</name>${tr.desc ? `\n    <desc>${esc(tr.desc)}</desc>` : ''}${tr.type ? `\n    <type>${esc(tr.type)}</type>` : ''}\n    <trkseg>\n${tr.points.map((p) => `      <trkpt ${ll(p)}>${p.ele != null ? `<ele>${p.ele.toFixed(1)}</ele>` : ''}${p.time ? `<time>${p.time}</time>` : ''}${p.name ? `<name>${esc(p.name)}</name>` : ''}</trkpt>`).join('\n')}\n    </trkseg>\n  </trk>`);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Snowkite-ekspedisjonsplanlegger ${APP_VERSION}" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata><name>${esc(meta.name)}</name>${meta.desc ? `<desc>${esc(meta.desc)}</desc>` : ''}<time>${now}</time></metadata>
-${[...w, ...t].join('\n')}
+${[...w, ...r, ...t].join('\n')}
 </gpx>
 `;
 }
@@ -56,7 +58,7 @@ export function sliceRoute(r: Route, fromD: number, toD: number, labels: [string
 
 export function waypointWpts(r: Route): GpxWpt[] {
   return r.waypoints
-    .filter((w) => (w.name && w.kind !== 'via') || w.category || w.description || w.notes)
+    .filter((w, i) => (w.name && w.kind !== 'via' && i !== 0 && i !== r.waypoints.length - 1) || w.category || w.description || w.notes)
     .map((w) => ({ lat: w.lat, lon: w.lon, ele: eleOf(w), name: w.name ?? 'Rutepunkt', desc: [w.description, `Status: ${w.verification ?? 'uverifisert'} · kilde: ${w.source}`].filter(Boolean).join(' | '), cmt: w.notes, type: w.category }));
 }
 export const campWpts = (camps: Camp[], arrival?: Map<string, string>): GpxWpt[] =>
@@ -70,7 +72,9 @@ export interface GpxRequest { kind: GpxKind; day?: number; routeId?: string; fro
 export function exportGpx(snap: ExportSnapshot, req: GpxRequest): { name: string; xml: string } {
   const { st, run } = snap;
   const route = req.kind === 'alternativ' ? st.routes.find((r) => r.id === req.routeId) : snap.route;
-  if (!route) throw new Error('Ingen rute å eksportere');
+  if (!route) throw new Error('Ingen rute å eksportere – lag eller velg en rute under Kart og rute.');
+  const problem = routeProblem(route);
+  if (problem) throw new Error(problem);
   const arrival = new Map<string, string>();
   run.days.forEach((d, i) => {
     const cid = run.plan.days[i]?.campId;
@@ -89,5 +93,11 @@ export function exportGpx(snap: ExportSnapshot, req: GpxRequest): { name: string
     return { name: `segment-${req.fromKm}-${req.toKm}km`, xml: buildGpx({ name: `${proj} – ${route.name} km ${req.fromKm}–${req.toKm}` }, [{ name: `${route.name} km ${req.fromKm}–${req.toKm}`, points: sliceRoute(route, a, b) }], wpts) };
   }
   // hele ruten (+ dagsetapper som egne spor for enheter som viser dem separat er unødvendig – ett spor)
-  return { name: req.kind === 'alternativ' ? `rute-${route.name}` : 'hele-ruten', xml: buildGpx({ name: `${proj} – ${route.name}`, desc: `Scenario «${run.plan.name}». Planlagt rute – ikke verifisert i terrenget. Eksportert fra snowkite-planleggeren.` }, [routeTrack(route)], wpts) };
+  return { name: req.kind === 'alternativ' ? `rute-${route.name}` : 'hele-ruten', xml: buildGpx({ name: `${proj} – ${route.name}`, desc: `Scenario «${run.plan.name}». Planlagt rute – ikke verifisert i terrenget. Eksportert fra snowkite-planleggeren.` }, [routeTrack(route)], [...endpointWpts(route).map((e) => ({ ...e, ele: e.ele ?? eleOf(route.waypoints[e.type === 'start' ? 0 : route.waypoints.length - 1]), desc: route.name })), ...wpts], route.waypoints.length <= RTE_MAX ? [routeRte(route)] : []) };
+}
+
+/** Samme rute som <rte>: start, mellompunkter og mål i rekkefølge – for GPS-er som navigerer etter ruter. */
+export function routeRte(r: Route): GpxTrack {
+  const n = r.waypoints.length;
+  return { name: r.name, points: r.waypoints.map((w, i) => ({ ...toPt(w), name: i === 0 ? 'Start' : i === n - 1 ? 'Mål' : w.name ?? `Punkt ${i}` })) };
 }

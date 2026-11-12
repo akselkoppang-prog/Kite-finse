@@ -133,7 +133,7 @@ async function bigJpeg(p, seed) {
   ok(d.routes.length === 2 && d.backups.some((b) => /GPX-import/.test(b.reason)), 'GPX-import: ny rute + sikkerhetskopi før import');
 
   // ---- 3: 100 rutepunkter ----
-  await p.click('button:has-text("+ Punkt (slutt)")');
+  await p.click('button:has-text("+ Forleng (nytt mål)")');
   const mb = await p.locator('.map').boundingBox();
   for (let i = 0; i < 100; i++) await p.mouse.click(mb.x + 80 + (i % 20) * 30, mb.y + 120 + Math.floor(i / 20) * 40);
   await p.click('button:has-text("Panorer")');

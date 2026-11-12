@@ -9,6 +9,7 @@ import type { SimResult } from '../lib/sim/route';
 import type { CalibTrack } from '../lib/sim/calibration';
 import type { SpecValue, KiteModel } from '../data/kiteSpecs';
 import { majorChange } from '../storage/hooks';
+import type { RouteDraft } from '../lib/route/draft';
 import { examplePlan, type PlanScenario } from '../lib/sim/expedition';
 import { DEFAULT_PACKING, type PackItem } from '../data/packing';
 import type { Dir8 } from '../lib/geo';
@@ -36,7 +37,7 @@ export interface SimUI {
 }
 export interface Itinerary { id: string; name: string; dayKm: number[] }
 export interface DailyCand { lat: number; lon: number; d: number; score: number; text: string; flags: string[] }
-export type EditMode = 'none' | 'add' | 'insert' | 'zone' | 'camp' | 'marker';
+export type EditMode = 'none' | 'add' | 'insert' | 'zone' | 'camp' | 'marker' | 'draft';
 
 export interface WindPoint { label: string; lat: number; lon: number; fc: Forecast }
 export interface FoodPlan { kcalPerDay: number; kcalPerKg: number; fuelLPerDay: number; reserveDays: number; extraDays: number }
@@ -89,6 +90,8 @@ export interface State {
   layers: LayerToggles;
   wms: { nve: WmsConfig; skred: WmsConfig };
   editMode: EditMode;
+  /** ruteveiviseren (ikke lagret før brukeren trykker «Lagre rute») */
+  routeDraft: RouteDraft | null;
   focus: { lat: number; lon: number; zoom?: number; t: number } | null;
   selectedWp: string | null;
   selectedMarker: string | null;
@@ -203,6 +206,7 @@ export const useStore = create<State>()(
         skred: { url: 'https://nve.geodataonline.no/arcgis/services/Bratthet/MapServer/WMSServer', layers: '' },
       },
       editMode: 'none',
+      routeDraft: null,
       focus: null,
       selectedWp: null,
       selectedMarker: null,
@@ -308,7 +312,9 @@ export const useStore = create<State>()(
       insertWaypoint: (routeId, lat, lon) =>
         set((s) => ({
           routes: s.routes.map((r) => {
-            if (r.id !== routeId || r.waypoints.length < 2) return r;
+            if (r.id !== routeId) return r;
+            // under to punkter finnes ingen etappe å sette inn i – legg til på slutten i stedet for å ignorere klikket
+            if (r.waypoints.length < 2) return { ...r, updatedAt: now(), waypoints: [...r.waypoints, { id: uid('wp'), lat, lon, kind: 'via', source: 'Satt inn manuelt i kart', dataKind: 'forslag' }] };
             // sett inn i segmentet som gir minst ekstra lengde
             let best = 1, bestCost = Infinity;
             const d = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) => Math.hypot((a.lat - b.lat) * 111, (a.lon - b.lon) * 55);

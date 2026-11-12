@@ -96,7 +96,7 @@ const state = async (p) => {
   await go(p, 'Kart & rute'); await p.waitForTimeout(500);
   const wc3 = await p.locator('.panel .card', { hasText: 'Vannkontroll' }).innerText().catch(() => '');
   ok(/VIKTIG/.test(wc3) && /utløpt/.test(wc3), 'utløpt overstyring blokkerer igjen (etter reload)');
-  await p.locator('.wplabel:has-text("Start (GPX)")').locator('xpath=..').dispatchEvent('click');
+  await p.locator('.eplabel:has-text("Start (GPX)")').locator('xpath=..').dispatchEvent('click');
   await p.waitForTimeout(400);
   ok(await p.locator('.drawer #wp-name').count() === 1, 'rutepunkt-panel åpnes ved klikk');
   await p.selectOption('#wp-cat', 'launch');

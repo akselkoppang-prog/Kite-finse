@@ -9,6 +9,7 @@ import WaypointPanel from './components/WaypointPanel';
 import CampPanel from './components/CampPanel';
 import { SimPlayer } from './components/sim/SimPlayer';
 import OverviewPanel from './components/OverviewPanel';
+import RouteBuilder from './components/RouteBuilder';
 import { ExpeditionProvider, useExpedition } from './state/expedition';
 import { useWarnings } from './lib/warnings';
 import { hhmm } from './lib/sim/expedition';
@@ -135,6 +136,9 @@ export default function App() {
     if (lastTab.current !== tab) setPrev(mainOf(lastTab.current) !== mainOf(tab) ? { from: lastTab.current, to: tab } : null);
     lastTab.current = tab;
   }, [tab]);
+  // ruteveiviseren trenger kartet: på smal skjerm lukkes sidepanelet når den åpnes
+  const drafting = useStore((s) => !!s.routeDraft);
+  useEffect(() => { if (drafting && window.innerWidth <= 700) setSide(false); }, [drafting]);
   useEffect(() => {
     loadInitialGpx().catch((e) => console.error('GPX', e));
   }, []);
@@ -189,6 +193,7 @@ export default function App() {
               {!selBar && !selWp && selMk && <WaypointPanel key={selMk} kind="marker" id={selMk} />}
               {!selBar && !selWp && !selMk && selCamp && <CampPanel key={selCamp} id={selCamp} />}
               <SimPlayer />
+              <RouteBuilder />
             </div>
             <ElevationProfile />
           </div>

@@ -5,7 +5,7 @@ import { getDB, type BlobRec } from './db';
 import { projectSnapshot, createBackup } from './backup';
 import { extractImages, writeStateAsProject } from './migrate';
 import { CACHE_KEYS } from './slices';
-import { toGpx } from '../lib/gpx';
+import { routeProblem, toGpx } from '../lib/gpx';
 import { scenarioFile } from '../state/expedition';
 import { slug } from '../lib/project/meta';
 import { uid } from '../lib/geo';
@@ -120,6 +120,8 @@ export async function exportZip(projectId: string, name: string, includeCaches =
   const mainRoute = st.routes.find((r) => r.id === main?.routeId) ?? st.routes.find((r) => r.id === st.activeRouteId) ?? st.routes[0];
   const usedNames = new Set<string>();
   st.routes.forEach((r) => {
+    // en rute uten start og mål kan ikke bli GPX – den ligger likevel komplett i project.json
+    if (routeProblem(r)) return;
     let fn = r.id === mainRoute?.id ? 'main-route' : `alternative-${slug(r.name)}`;
     while (usedNames.has(fn)) fn += '-2';
     usedNames.add(fn);
@@ -242,7 +244,7 @@ export async function importProject(file: File | Blob, mode: 'new' | 'replace', 
   if (mode !== 'new') {
     await createBackup('Før import (erstatt prosjekt)', false, true);
     const patch: Record<string, unknown> = { ...converted };
-    for (const k of ['focus', 'editMode', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'selectedCamp', 'simPlay', 'dailyView', 'windPoints', 'format', 'version', 'exportedAt', 'appVersion', 'appBuiltAt', 'appCommit']) delete patch[k];
+    for (const k of ['focus', 'editMode', 'routeDraft', 'selectedWp', 'selectedMarker', 'selectedBarrier', 'selectedCamp', 'simPlay', 'dailyView', 'windPoints', 'format', 'version', 'exportedAt', 'appVersion', 'appBuiltAt', 'appCommit']) delete patch[k];
     useStore.setState(sanitize({ ...persistable(useStore.getState()), ...patch }).state as Partial<State>);
     useStore.getState().log('annet', `Importerte prosjektfil (${format}) og erstattet aktivt prosjekt`);
   }

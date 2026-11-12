@@ -21,6 +21,24 @@ Krever Node 18+. Ingen API-nøkler trengs (per nov. 2026).
 **GitHub Pages:** workflowen `.github/workflows/pages.yml` bygger og publiserer ved push til `main`.
 Slå på Pages i repoets innstillinger (Settings → Pages → Source: GitHub Actions).
 
+## Ruteveiviser – start, mål og GPX
+
+**Rotårsak til at start/mål ikke kunne settes:** appen hadde ingen måte å lage en ny rute på (bare importere eller duplisere), «start» og «mål» var bare implisitt første/siste punkt, «+ Punkt» la alltid til etter det siste punktet (så starten kunne ikke velges eller byttes), og å sette inn punkter i en rute med under to punkter ble ignorert uten melding.
+
+**Nå:** Kart og rute → «＋ Ny rute» (eller «✎ Rediger start, mål og punkter» for en lagret rute) åpner en veiviser over kartet:
+1. **Start** – trykk i kartet, søk på stedsnavn (Kartverket) eller skriv koordinater (`60.6012, 7.5034`, `60,6012 7,5034`, `N60.6 E7.5`, `60°36'4"N 7°30'12"E`). Grønt START-merke.
+2. **Mål** – samme måter. Rutete MÅL-merke. «Bytt om start og mål».
+3. **Mellompunkter** (valgfritt) – nummerert i kartet og i listen; settes inn der de gir minst omvei, kan flyttes (dra), få navn, flyttes opp/ned og slettes.
+4. **Linje** – rette linjer mellom punktene (ingen rutetjeneste – på snø over vidda finnes ingen veier å rute etter), eller *følg linjen i en eksisterende rute* der punktene ligger innen 3 km fra den. Distanse, luftlinje, stigning/fall (Kartverket DTM) og grov kitetid.
+5. **Lagre** – navn, oppsummering, «Bruk i scenarioet». Mangler noe, forklares det med lenke til steget.
+6. **GPX** – last ned med én gang.
+
+Angre/gjør om (↶ ↷) for alle endringer av punkter. Punkter valgt i kartet får navnet på nærmeste sted. Ingenting lagres før «Lagre». Redigering av lagrede ruter beholder id, navn, notater og høyde på punkter som ikke flyttes; store GPX-ruter beholder sin detaljerte linje mellom start og mål. Start og mål vises som START/MÅL på kartet, og må bekreftes hvis de dras.
+
+**GPX 1.1:** spor (`trk`, alle punkter = den faktiske linjen), rute (`rte`, Start → punkter → Mål, for GPS-navigasjon; bare for ruter med ≤ 250 punkter) og START/MÅL-punkter (`wpt` med symbol). Rekkefølge og elementrekkefølge følger skjemaet. Ruter uten start og mål eller med ugyldige koordinater eksporteres ikke – feilen forklares. Import av vår egen GPX gir samme rute tilbake (ikke dobbel spor+rute, START/MÅL og navngitte punkter blir navn på rutepunktene, ikke ekstra markører).
+
+Test: `tests/route.test.ts` (koordinater, rekkefølge, validering, følge rute, GPX) og `tests/e2e/route-e2e.cjs` (kart, søk, koordinater, mellompunkter, flytting, rekkefølge, angre, lagre og gjenåpne, redigere, eksport, re-import med koordinatkontroll, beskyttelse av start, mobil).
+
 ## Brukervennlighet – enkel som standard, kraftig ved behov
 
 **Struktur (7 hovedvalg):** 🏠 **Start** (kom i gang + status) · 🗺️ **Kart og rute** (kart, vann og is) · 📅 **Dagplan** (dag for dag, overnatting, scenarioer, kalender og sol, grovplan og plan B) · 🌬️ **Vær & kite** (vær langs ruten, vind i dag, kitevalg, simulator, kitedatabase) · 🎒 **Utstyr & mat** (pakkeliste, mat og vann, sikkerhet) · 📁 **Prosjekt** (prosjektet, oppgaver og team, eksport og deling) · ⚙️ **Innstillinger**. Hele strukturen og forklaringen til hver side ligger ett sted: `src/lib/ux/nav.ts`.
