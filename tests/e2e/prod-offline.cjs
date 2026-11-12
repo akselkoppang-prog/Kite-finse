@@ -52,7 +52,7 @@ async function allTabs(p, errs, label) {
   errs.length = 0;
   await allTabs(p, errs, 'UTEN NETT');
   // lagring uten nett
-  await p.locator('nav.mainnav button').nth(1).click(); await p.locator('nav.subnav button').first().click(); await p.waitForTimeout(800);
+  await p.locator('nav.mainnav button', { hasText: 'Dagplan' }).click(); await p.locator('nav.subnav button').first().click(); await p.waitForTimeout(800);
   await p.locator('#d0-dep').fill('9.25'); await p.waitForTimeout(1500);
   ok(/LAGRET/.test(await p.locator('.saveind').innerText()), 'UTEN NETT: endringer lagres (IndexedDB)');
   // eksport uten nett (PDF-motoren ligger i offline-pakken)
@@ -100,12 +100,13 @@ async function allTabs(p, errs, label) {
   let blocked = 0, reloaded = false;
   await p3.evaluate(async () => { for (const k of await caches.keys()) if (k.startsWith('kite-app-')) await caches.delete(k); });
   // filen «finnes ikke» helt til siden lastes på nytt (som etter en ny utrulling)
-  p3.on('framenavigated', (f) => { if (f === p3.mainFrame()) reloaded = true; });
-  await ctx.route('**/assets/StatusPage-*.js', (r) => (reloaded ? r.continue() : (blocked++, r.fulfill({ status: 404, contentType: 'text/html', body: 'not found' }))));
-  await p3.locator('nav.subnav button', { hasText: 'Status' }).click();
+  p3.on('load', () => { reloaded = true; }); // ekte omlasting (hash-endringer ved menyvalg teller ikke)
+  await ctx.route('**/assets/FoodPage-*.js', (r) => (reloaded ? r.continue() : (blocked++, r.fulfill({ status: 404, contentType: 'text/html', body: 'not found' }))));
+  await p3.locator('nav.mainnav button', { hasText: 'Utstyr' }).click(); await p3.waitForTimeout(600);
+  await p3.locator('nav.subnav button', { hasText: 'Mat og vann' }).click();
   await p3.waitForTimeout(9000);
-  ok(blocked >= 1 && reloaded && await p3.locator('#ready-pct').count() === 1 && !(await p3.locator('.errorboundary').count()), `manglende sidefil: appen lastet seg selv på nytt og viser siden brukeren ba om (${blocked} mislykkede hentinger, omlastet: ${reloaded})`);
-  await ctx.unroute('**/assets/StatusPage-*.js');
+  ok(blocked >= 1 && reloaded && await p3.locator('#food-target').count() === 1 && !(await p3.locator('.errorboundary').count()), `manglende sidefil: appen lastet seg selv på nytt og viser siden brukeren ba om (${blocked} mislykkede hentinger, omlastet: ${reloaded})`);
+  await ctx.unroute('**/assets/FoodPage-*.js');
 
   // --- oppdateringsbanner: serveren har nyere versjon enn fanen ---
   const p4 = await ctx.newPage();
