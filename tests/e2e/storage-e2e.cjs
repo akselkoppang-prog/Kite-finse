@@ -121,7 +121,7 @@ async function bigJpeg(p, seed) {
   await go(p, 'Innstillinger / Lagring'); await p.waitForTimeout(800);
   ok(/VERIFISERT/.test(await p.locator('.page .card', { hasText: 'Flytting fra gammel lagring' }).innerText()), 'lagringssiden viser verifisert migrering og rotårsak');
   // v6: nye prosjekter lages under Oversikt → Prosjekt
-  await p.locator('nav.mainnav button', { hasText: 'Oversikt' }).click(); await p.locator('nav.subnav button', { hasText: 'Prosjekt' }).click(); await p.waitForTimeout(600);
+  await go(p, 'Prosjekt'); await p.waitForTimeout(600);
   await p.click('button:has-text("+ Nytt prosjekt")'); await p.fill('#new-proj-name', 'Ny ekspedisjon test');
   await p.locator('.newproj button', { hasText: 'Finse–Rjukan-ruten' }).click(); await p.click('#new-proj-ok'); await p.waitForTimeout(2500);
   d = proj(await dump(p));

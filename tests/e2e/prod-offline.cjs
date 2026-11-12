@@ -56,7 +56,7 @@ async function allTabs(p, errs, label) {
   await p.locator('#d0-dep').fill('9.25'); await p.waitForTimeout(1500);
   ok(/LAGRET/.test(await p.locator('.saveind').innerText()), 'UTEN NETT: endringer lagres (IndexedDB)');
   // eksport uten nett (PDF-motoren ligger i offline-pakken)
-  await p.locator('nav.mainnav button', { hasText: 'Eksport' }).click(); await p.waitForTimeout(1200);
+  await p.locator('nav.mainnav button', { hasText: 'Prosjekt' }).click(); await p.locator('nav.subnav button', { hasText: 'Eksport' }).click(); await p.waitForTimeout(1200);
   const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 120000 }), p.click('#exp-pdf')]);
   const pf = __dirname + '/shots/offline.pdf'; await dl.saveAs(pf);
   const txt = execFileSync('pdftotext', [pf, '-'], { encoding: 'utf8' });

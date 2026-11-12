@@ -25,7 +25,7 @@ eval(fs.readFileSync(__dirname + '/wxstubs.inc', 'utf8').replace(/async function
     await p.locator('nav.mainnav button', { hasText: m }).first().click(); await p.locator('nav.subnav button', { hasText: s }).click(); await p.waitForTimeout(1200);
     console.log(`page ${s}: ok`, (await p.locator('.page').innerText()).length > 200);
   }
-  await p.locator('nav.mainnav button', { hasText: 'Eksport' }).click(); await p.waitForTimeout(1500);
+  await p.locator('nav.mainnav button', { hasText: 'Prosjekt' }).click(); await p.locator('nav.subnav button', { hasText: 'Eksport' }).click(); await p.waitForTimeout(1500);
   const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 120000 }), p.click('#exp-pdf')]);
   const f = __dirname + '/shots/swv7.pdf'; await dl.saveAs(f);
   const txt = execFileSync('pdftotext', [f, '-'], { encoding: 'utf8' });

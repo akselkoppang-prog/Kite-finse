@@ -24,13 +24,13 @@ const tile = fs.readFileSync(__dirname + '/testtile.png');
   console.log('SW controller:', await p.evaluate(() => !!navigator.serviceWorker.controller));
   console.log('tiles loaded in map:', await p.locator('img.leaflet-tile-loaded').count(), '| broken:', await p.evaluate(() => [...document.querySelectorAll('img.leaflet-tile')].filter((i) => i.complete && i.naturalWidth === 0).length));
   console.log('route drawn:', await p.locator('path.leaflet-interactive').count());
-  await p.locator('nav.mainnav button', { hasText: 'Eksport' }).click(); await p.waitForTimeout(1500);
+  await p.locator('nav.mainnav button', { hasText: 'Prosjekt' }).click(); await p.locator('nav.subnav button', { hasText: 'Eksport' }).click(); await p.waitForTimeout(1500);
   const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 120000 }), p.click('#exp-pdf')]);
   const f = __dirname + '/shots/sw.pdf'; await dl.saveAs(f);
   const txt = execFileSync('pdftotext', [f, '-'], { encoding: 'utf8' });
   console.log('PDF size', fs.statSync(f).size, '| grid fallback used:', /Kartfliser var ikke tilgjengelige/.test(txt), '| Kartverket attribution:', /Kartgrunnlag: © Kartverket/.test(txt));
   // kartinteraksjon med service worker på
-  await p.locator('nav.mainnav button', { hasText: 'Oversikt' }).click(); await p.waitForTimeout(1500);
+  await p.locator('nav.mainnav button', { hasText: 'Kart og rute' }).click(); await p.waitForTimeout(1500);
   const box = await p.locator('.leaflet-container').boundingBox();
   for (const [fx, fy] of [[0.3, 0.85], [0.6, 0.15], [0.15, 0.5]]) { await p.mouse.click(box.x + box.width * fx, box.y + box.height * fy); await p.waitForTimeout(400); if (await p.locator('.clickmenu').count()) break; }
   console.log('map click menu:', await p.locator('.clickmenu').count() === 1);
@@ -38,7 +38,7 @@ const tile = fs.readFileSync(__dirname + '/testtile.png');
   console.log('zoom ok, tiles after zoom:', await p.locator('img.leaflet-tile-loaded').count());
   // offline: PDF fra flisene som nå ligger lesbart i cachen
   await ctx.setOffline(true);
-  await p.locator('nav.mainnav button', { hasText: 'Eksport' }).click(); await p.waitForTimeout(1000);
+  await p.locator('nav.mainnav button', { hasText: 'Prosjekt' }).click(); await p.locator('nav.subnav button', { hasText: 'Eksport' }).click(); await p.waitForTimeout(1000);
   const [dl2] = await Promise.all([p.waitForEvent('download', { timeout: 120000 }), p.click('#exp-pdf')]);
   const f2 = __dirname + '/shots/sw-offline.pdf'; await dl2.saveAs(f2);
   const t2 = execFileSync('pdftotext', [f2, '-'], { encoding: 'utf8' });
