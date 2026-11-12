@@ -175,7 +175,7 @@ const state = async (p) => {
   const pj = JSON.parse(require('child_process').execSync(`python3 -c "import zipfile;z=zipfile.ZipFile('${jp}');print(z.read([n for n in z.namelist() if n.endswith('project.json')][0]).decode())"`).toString());
   const sl = pj.slices;
   ok(pj.version === 3 && sl.lakeOverrides.length >= 1 && sl.quivers && sl.markers.length >= 1 && sl.tripDate === '2027-03-30' && sl.history.length > 0 && sl.travel, 'prosjektfil (ZIP v3) inneholder overstyringer, kites, datoer, markører, historikk, modell');
-  ok(/Mat og vann/.test(await p.locator('.page .card', { hasText: 'Mat og brensel' }).innerText()), 'mat/brensel lenker til matplanen');
+  ok(/mat og vann/i.test(await p.locator('.nextstep').innerText()), 'pakkelisten lenker videre til matplanen');
   await p.evaluate(() => new Promise((res) => { localStorage.clear(); const r = indexedDB.deleteDatabase('kite-finse-rjukan'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
   await p.goto('about:blank'); await p.goto(URL0); await openAdv(p); await p.waitForSelector('.saveind'); await p.waitForTimeout(1500);
   await go(p, 'Kart & rute');
