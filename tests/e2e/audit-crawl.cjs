@@ -6,13 +6,15 @@ let fail = 0;
 const ok = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) fail++; };
 
 // v5-navigasjon: gamle fanenavn → hovedmeny + undermeny
-const NAV = { 'Scenarioer': ['Dagplan', 'Scenarioer'], 'Prosjekt': ['Oversikt', 'Prosjekt'], 'Eksport': ['Eksport', 'Eksport & deling'], 'Kart & rute': ['Oversikt'], 'Overstyringer': ['Utstyr & planlegging', 'Vann-godkjenninger'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Avansert dagsfordeling'], 'Dagene': ['Dagplan', 'Dagene'], 'Kite og vind': ['Vær & kite', 'Kite og vind'], 'Utstyr & offline': ['Utstyr & planlegging', 'Utstyr'], 'Mat': ['Utstyr & planlegging', 'Mat og vann'], 'Vær langs ruten': ['Vær & kite', 'Vær langs ruten'], 'Overnatting': ['Dagplan', 'Overnatting'], 'Status': ['Oversikt', 'Status'], 'Oppgaver': ['Oversikt', 'Oppgaver og team'], 'Vær & vind': ['Vær & kite', 'Værmelding'], 'Sikkerhet': ['Utstyr & planlegging', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+const NAV = { 'Scenarioer': ['Dagplan', 'Scenarioer'], 'Prosjekt': ['Prosjekt', 'Prosjektet'], 'Eksport': ['Prosjekt', 'Eksport og deling'], 'Kart & rute': ['Kart og rute', 'Kart'], 'Overstyringer': ['Kart og rute', 'Vann og is'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Grovplan og plan B'], 'Dagene': ['Dagplan', 'Dag for dag'], 'Kite og vind': ['Vær & kite', 'Kitevalg'], 'Utstyr & offline': ['Utstyr & mat', 'Pakkeliste'], 'Mat': ['Utstyr & mat', 'Mat og vann'], 'Vær langs ruten': ['Vær & kite', 'Vær langs ruten'], 'Overnatting': ['Dagplan', 'Overnatting'], 'Status': ['Start'], 'Oppgaver': ['Prosjekt', 'Oppgaver og team'], 'Vær & vind': ['Vær & kite', 'Vind i dag'], 'Sikkerhet': ['Utstyr & mat', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+// Legacy-suitene tester funksjonalitet i «Detaljert» visning (alt åpent); enkel visning testes i ux-e2e.cjs
+const DETAILED = () => { try { localStorage.setItem('kite-ui-prefs', JSON.stringify({ detailed: true, hints: true, guideHidden: false })); } catch {} };
 async function openAdv(p) { await p.evaluate(() => document.querySelectorAll('details.ov-adv').forEach((d) => { d.open = true; })); await p.waitForTimeout(200); }
 async function go(p, name) {
   const [m, s] = NAV[name] || [name];
-  await p.locator('nav.mainnav button', { hasText: m }).first().click();
+  await p.locator('nav.mainnav button', { hasText: m }).first().click(); await p.waitForTimeout(80);
   if (s && (await p.locator('nav.subnav').count())) await p.locator('nav.subnav button', { hasText: s }).first().click();
-  if (m === 'Oversikt') { await p.waitForTimeout(200); await openAdv(p); }
+  if (m === 'Kart og rute') { await p.waitForTimeout(200); await openAdv(p); }
 }
 // TESTSTUBBER (kun i test): realistisk svarformat for tjenester sandkassen ikke når
 async function stubs(p) {
@@ -100,13 +102,13 @@ const alive = (p) => p.evaluate(() => !!document.querySelector('nav.mainnav') &&
   const mode = process.argv[3] || 'all';
   const b = await chromium.launch();
   const bag0 = []; const bag = { push: (x) => { if (!bag0.includes(x)) { bag0.push(x); console.log('FUNN', x); } } }; let where = 'start';
-  const mk = async (dev) => { const c = await b.newContext({ ...(dev || { viewport: { width: 1366, height: 950 } }), serviceWorkers: 'block', acceptDownloads: true }); const p = await c.newPage(); watch(p, bag0, () => where); await stubs(p); await weatherStubs(p); return { c, p }; };
+  const mk = async (dev) => { const c = await b.newContext({ ...(dev || { viewport: { width: 1366, height: 950 } }), serviceWorkers: 'block', acceptDownloads: true }); await c.addInitScript(DETAILED); const p = await c.newPage(); watch(p, bag0, () => where); await stubs(p); await weatherStubs(p); return { c, p }; };
 
   // ---------- A: alle sider, standardprosjekt (desktop + mobil) ----------
   let { c, p } = await mk();
   let confirmMode = 'dismiss';
   p.on('dialog', (d) => (confirmMode === 'accept' || d.type() === 'beforeunload' ? d.accept(d.type() === 'prompt' ? 'Testnavn' : undefined) : d.dismiss()));
-  await p.goto(URL0, { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(3500);
+  await p.goto(URL0 + '#oversikt', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(3500);
   const T = await tabs(p);
   console.log('faner:', T.length);
   // legg inn data så sidene har noe å vise

@@ -1,3 +1,5 @@
+import { Advanced } from '../ux';
+import { useUiPrefs } from '../../state/uiprefs';
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { useTerrain, useBarrierCheck, useActiveRoute } from '../../state/derived';
@@ -30,7 +32,8 @@ export default function DayCard({ i, day, out, forecastAvailable }: { i: number;
   const route = useActiveRoute();
   const terrain = useTerrain(route);
   const check = useBarrierCheck(route);
-  const [windOpen, setWindOpen] = useState(i === 0);
+  const detailed = useUiPrefs((x) => x.detailed);
+  const [windOpen, setWindOpen] = useState(i === 0 && detailed);
   const [local, setLocal] = useState<TerrainSample[] | null>(null);
   const [busy, setBusy] = useState(false);
   const color = DAY_COLORS[i % DAY_COLORS.length];
@@ -92,16 +95,18 @@ export default function DayCard({ i, day, out, forecastAvailable }: { i: number;
             <div className="tile"><span>Dagslys igjen</span><b className={out.daylightLeftH != null && out.daylightLeftH < 1 ? 'err' : ''}>{out.daylightLeftH != null ? `${out.daylightLeftH.toFixed(1)} t` : '–'}</b><small>sol ned {hhmm(out.sunset)}</small></div>
             <div className="tile"><span>Igjen til {s.project.destination || 'mål'}</span><b>{out.remainingKm.toFixed(0)} km</b><small>{out.reason}</small></div>
           </div>
+          <Advanced title="Slik er dagen regnet ut" hint="fart, kryssing, pauser og usikkerhet">
           <div className="dc-bars" title="Teoretisk bevegelse = fart × timer. Fremdrift = det du faktisk kommer nærmere målet langs ruten.">
             <div className="bar"><span>Teoretisk bevegelse ({day.speedKmh} km/t × {day.activeH} t)</span><i style={{ width: '100%' }} /><b>{out.theoreticalKm.toFixed(0)} km</b></div>
             <div className="bar"><span>Faktisk seilt (med kryss/omveier)</span><i style={{ width: `${Math.min(100, (100 * out.sailedKm) / Math.max(1, out.theoreticalKm))}%` }} /><b>{out.sailedKm.toFixed(0)} km</b></div>
             <div className="bar prog"><span>Fremdrift langs ruten</span><i style={{ width: `${Math.min(100, (100 * out.progressKm) / Math.max(1, out.theoreticalKm))}%`, background: color }} /><b>{out.progressKm.toFixed(0)} km</b></div>
           </div>
           <p className="small muted">{out.upwindShare > 0.2 ? `${Math.round(out.upwindShare * 100)} % av strekket er mot vinden (kryssing). ` : ''}{out.underShare > 0.2 ? `${Math.round(out.underShare * 100)} % med for lite vind for kiten. ` : ''}{out.overShare > 0.2 ? `${Math.round(out.overShare * 100)} % med for mye vind. ` : ''}Vind: {out.windSource}.</p>
+            <DayExplain out={out} day={day} />
+          </Advanced>
         </>
       )}
 
-      {!done && <DayExplain out={out} day={day} />}
 
       <DaylightBar sun={sun} startH={day.departure} endH={done ? day.departure : out.arrival} label={`Sol opp ${hhmm(out.sunrise)} · ned ${hhmm(out.sunset)} · ${sun.daylightH.toFixed(1)} t dagslys · reise ${hhmm(day.departure)}–${hhmm(out.arrival)}`} />
 

@@ -1,3 +1,4 @@
+import { Advanced } from '../components/ux';
 import { useStore } from '../state/store';
 import { useAcceptance } from './SafetyPage';
 import { Badge, Card, fmtTime } from '../components/ui';
@@ -26,10 +27,12 @@ export default function TimelinePage() {
         <p className="small">Værprognose (MET) tilgjengelig fra ca. <b>{addDays(s.tripDate, -9)}</b>. Skredvarsel publiseres daglig 1. des–31. mai.</p>
       </Card>
       <SunExplorer />
+      <Advanced className="wide" title="Soltabell per dag" hint="soloppgang, solnedgang og dagslys">
       <Card title="Soltabell per dag (etappens midtpunkt)" className="wide">
         <SunTable />
         <p className="small muted">Beregnet med SunCalc (astronomiske formler, ~1 min nøyaktighet) for datoen og koordinatene midt på hver dagsetappe. Tidssone Europe/Oslo – sommertid starter 28.03.2027.</p>
       </Card>
+      </Advanced>
       <Card title={`Planleggingskalender · ${daysLeft} dager til ${s.tripDate}`} className="wide">
         <div className="timeline">
           {PHASES.map((p) => (
@@ -58,6 +61,7 @@ export default function TimelinePage() {
         </ul>
         <p className="small muted">GO er alltid din egen vurdering. Verktøyet kan bare si NO-GO når kjente data mangler eller viser barrierer.</p>
       </Card>
+      <Advanced className="wide" title="Dataferskhet" hint="når dataene sist ble hentet">
       <Card title="Dataferskhet">
         <ul className="small">
           {Object.values(SOURCES).filter((x) => x.kind === 'REST-API').map((src) => {
@@ -70,6 +74,7 @@ export default function TimelinePage() {
           })}
         </ul>
       </Card>
+      </Advanced>
     </div>
   );
 }

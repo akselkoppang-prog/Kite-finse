@@ -9,6 +9,7 @@ import { slug } from '../lib/project/meta';
 import { TripStrip } from '../components/plan/TripStrip';
 import ScenarioMap from '../components/ScenarioMap';
 import { Card } from '../components/ui';
+import { Term } from '../components/ux';
 
 /** Scenarioer: lagre, gi navn, kopiere, sammenligne, velge hovedplan, dele og slette. */
 export default function ScenariosPage() {
@@ -30,8 +31,18 @@ export default function ScenariosPage() {
 
   return (
     <div className="page">
-      <Card title={`Scenarioer (${plans.length})`} className="wide" right={<span className="small muted">★ = hovedplan · ✎ = det du redigerer nå</span>}>
+      <Card title={`Scenarioer (${plans.length})`} className="wide" right={<span className="small muted">★ = <Term k="hovedplan" /> · ✎ = det du redigerer nå</span>}>
         <p className="small muted">Hvert scenario har egen rute, vind, avreise, kite per dag, fart, kitetimer, pauser, teltplasser og notater. Å endre ett scenario endrer aldri et annet.</p>
+        <div className="row small">
+          <button className="btn primary" onClick={() => { const id = duplicatePlan(mainId, 'Nytt scenario', true); setMsg('Nytt scenario laget som kopi av hovedplanen – du redigerer det nå.'); set({ compareIds: [...new Set([...compareIds, id])] }); }}>+ Nytt scenario (kopi av hovedplanen)</button>
+          <label className="btn ghost filebtn">Importer delt scenario …<input type="file" accept=".json,application/json" onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (!f) return;
+            try { const id = importScenario(await f.text()); toggle(id, true); setMsg('Scenarioet er importert som et nytt scenario. Ingenting eksisterende er endret.'); } catch (err) { setMsg(`❌ ${(err as Error).message}`); }
+          }} /></label>
+          {msg && <span className="msg">{msg}</span>}
+        </div>
         <div className="scenlist">
           {allRuns.map((r) => {
             const p = r.plan;
@@ -66,16 +77,6 @@ export default function ScenariosPage() {
             );
           })}
         </div>
-        <div className="row small">
-          <button className="btn" onClick={() => { const id = duplicatePlan(mainId, 'Nytt scenario', true); setMsg('Nytt scenario laget som kopi av hovedplanen – du redigerer det nå.'); set({ compareIds: [...new Set([...compareIds, id])] }); }}>+ Nytt scenario (kopi av hovedplanen)</button>
-          <label className="btn ghost filebtn">Importer delt scenario …<input type="file" accept=".json,application/json" onChange={async (e) => {
-            const f = e.target.files?.[0];
-            e.target.value = '';
-            if (!f) return;
-            try { const id = importScenario(await f.text()); toggle(id, true); setMsg('Scenarioet er importert som et nytt scenario. Ingenting eksisterende er endret.'); } catch (err) { setMsg(`❌ ${(err as Error).message}`); }
-          }} /></label>
-          {msg && <span className="msg">{msg}</span>}
-        </div>
       </Card>
 
       <Card title={`Sammenligning (${cmpRuns.length})`} className="wide">
@@ -90,7 +91,7 @@ export default function ScenariosPage() {
             <ScenarioMap runs={cmpRuns} />
           </>
         )}
-        {routes.length > 1 && <p className="small muted">Scenarioer kan bruke ulike ruter: åpne scenarioet og velg rute under Oversikt → «Rute og data». Valget lagres i scenarioet.</p>}
+        {routes.length > 1 && <p className="small muted">Scenarioer kan bruke ulike ruter: åpne scenarioet og velg rute under Kart → panelet «Rute og data». Valget lagres i scenarioet.</p>}
       </Card>
     </div>
   );

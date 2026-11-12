@@ -1,3 +1,4 @@
+import { Advanced, NextStep } from '../components/ux';
 import { useStore } from '../state/store';
 import { kiteInput } from '../state/sim';
 import { useExpedition, updateDay } from '../state/expedition';
@@ -84,6 +85,7 @@ export default function WeatherKitePage() {
         <div className="legendmini small"><span><i style={{ background: '#22c55e' }} />passer</span><span><i style={{ background: '#eab308' }} />på grensen</span><span><i style={{ background: '#94a3b8' }} />for liten</span><span><i style={{ background: '#ef4444' }} />for stor</span></div>
       </Card>
 
+      <Advanced className="wide" title="Dine egne vindgrenser" hint="overstyr vindområdet for en kite">
       <Card title="Dine egne vindgrenser" >
         <p className="small muted">Erfaring slår modellen. Legg inn hva du selv mener kiten tåler med pulk – det brukes i all planlegging.</p>
         {q.kiteIds.map((id) => {
@@ -100,6 +102,8 @@ export default function WeatherKitePage() {
           );
         })}
       </Card>
+      </Advanced>
+      <NextStep to="utstyr">Pakkelisten</NextStep>
     </div>
   );
 }

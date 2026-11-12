@@ -8,6 +8,7 @@ import { hhmm } from '../lib/sim/expedition';
 import { addDays } from '../lib/sun';
 import { useLinkText } from './TasksPage';
 import { Card } from '../components/ui';
+import GettingStarted, { Glossary } from '../components/GettingStarted';
 
 const fmtD = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('nb-NO', { weekday: 'short', day: 'numeric', month: 'short' });
 
@@ -42,7 +43,8 @@ export default function StatusPage() {
   const pct = Math.round(r.overall * 100);
   return (
     <div className="page statuspage">
-      <Card title={st.project.name} className="wide status-hero">
+      <GettingStarted />
+      <Card title={`${st.project.name} – hvor klare er dere?`} className="wide status-hero">
         <div className="sh-grid">
           <div className="ring" style={{ background: `conic-gradient(${pct >= 80 ? 'var(--green)' : pct >= 55 ? 'var(--yellow)' : 'var(--red)'} ${pct * 3.6}deg, #1d2a44 0)` }}><div><b id="ready-pct">{pct} %</b><small>klar</small></div></div>
           <div className="sh-facts">
@@ -64,6 +66,17 @@ export default function StatusPage() {
         ))}
       </div>
 
+      <Card title="Snarveier" className="wide">
+        <div className="sc-grid">
+          <button className="btn" onClick={() => st.setTab('oversikt')}>🗺️ Se kartet<small>Ruten og dagsetappene</small></button>
+          <button className="btn" onClick={() => st.setTab('plan')}>📅 Planlegg dagene<small>Avreise, fart, vind</small></button>
+          <button className="btn" onClick={() => st.setTab('vaer')}>🌬️ Været<small>Dag for dag langs ruten</small></button>
+          <button className="btn" onClick={() => st.setTab('utstyr')}>🎒 Pakkeliste<small>Kryss av det som er pakket</small></button>
+          <button className="btn" onClick={() => st.setTab('scenarier')}>🔀 Sammenlign scenarioer<small>Prøv andre datoer og ruter</small></button>
+          <button className="btn" onClick={() => st.setTab('eksport')}>📤 Eksporter<small>PDF, GPX, Excel, ZIP</small></button>
+        </div>
+      </Card>
+
       <Card title="Trenger oppmerksomhet" className="wide">
         {r.areas.flatMap((a) => a.todo).length ? (
           <ul className="todo">{r.areas.flatMap((a) => a.todo.map((t, k) => <li key={`${a.id}${k}`}><button className="link" onClick={() => st.setTab(t.tab)}>{t.text}</button></li>))}</ul>
@@ -78,13 +91,14 @@ export default function StatusPage() {
         </ol>
       </Card>
 
-      <Card title="Scenarioene">
+      <Card title="Scenarioene" right={<button className="link small" onClick={() => st.setTab('scenarier')}>Alle →</button>}>
         <table className="cmptable small">
           <thead><tr><th>Scenario</th><th>Avreise</th><th>Ankomst</th><th>Farlig</th></tr></thead>
           <tbody>{runs.map((rn) => { const s = summarize(rn); return <tr key={rn.plan.id} className={rn.plan.id === plan.id ? 'best' : ''}><td><button className="link" onClick={() => st.set({ activePlanId: rn.plan.id })}>{rn.plan.name}{rn.plan.id === st.mainPlanId ? ' ★' : ''}</button></td><td>{fmtD(rn.plan.tripDate ?? st.tripDate)}</td><td>{s.doneDay ? `dag ${s.doneDay.day} ${hhmm(s.doneDay.arrival)}` : `${s.remainingKm.toFixed(0)} km igjen`}</td><td>{rn.plan.id === plan.id ? ins.hazards.filter((h) => h.level === 'viktig').length : '–'}</td></tr>; })}</tbody>
         </table>
         <button className="link small" onClick={() => st.setTab('scenarier')}>Sammenlign i detalj →</button>
       </Card>
+      <Glossary />
     </div>
   );
 }

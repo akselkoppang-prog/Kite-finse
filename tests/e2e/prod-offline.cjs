@@ -33,7 +33,7 @@ async function allTabs(p, errs, label) {
   const p = await ctx.newPage();
   const errs = []; p.on('pageerror', (e) => errs.push(e.message));
   p.on('dialog', (d) => d.accept());
-  await p.goto(URL0); await p.waitForTimeout(4000);
+  await p.goto(URL0 + '#oversikt'); await p.waitForTimeout(4000);
   const v1 = ver();
   ok(/^\d{4}\.\d\d\.\d\d\.\d{3}(-lokal)?$/.test(v1), `versjon i version.json har riktig format: ${v1}`);
   ok((await shown(p)).includes(v1), `bunnteksten viser versjonen (${await shown(p)})`);

@@ -6,13 +6,15 @@ let fail = 0;
 const ok = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) fail++; };
 
 // v5-navigasjon: gamle fanenavn → hovedmeny + undermeny
-const NAV = { 'Kart & rute': ['Oversikt'], 'Overstyringer': ['Utstyr & planlegging', 'Vann-godkjenninger'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Avansert dagsfordeling'], 'Dagene': ['Dagplan', 'Dagene'], 'Kite og vind': ['Vær & kite', 'Kite og vind'], 'Utstyr & offline': ['Utstyr & planlegging', 'Utstyr'], 'Vær & vind': ['Vær & kite', 'Værmelding'], 'Sikkerhet': ['Utstyr & planlegging', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+const NAV = { 'Scenarioer': ['Dagplan', 'Scenarioer'], 'Prosjekt': ['Prosjekt', 'Prosjektet'], 'Eksport': ['Prosjekt', 'Eksport og deling'], 'Kart & rute': ['Kart og rute', 'Kart'], 'Overstyringer': ['Kart og rute', 'Vann og is'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Grovplan og plan B'], 'Dagene': ['Dagplan', 'Dag for dag'], 'Kite og vind': ['Vær & kite', 'Kitevalg'], 'Utstyr & offline': ['Utstyr & mat', 'Pakkeliste'], 'Mat': ['Utstyr & mat', 'Mat og vann'], 'Vær langs ruten': ['Vær & kite', 'Vær langs ruten'], 'Overnatting': ['Dagplan', 'Overnatting'], 'Status': ['Start'], 'Oppgaver': ['Prosjekt', 'Oppgaver og team'], 'Vær & vind': ['Vær & kite', 'Vind i dag'], 'Sikkerhet': ['Utstyr & mat', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+// Legacy-suitene tester funksjonalitet i «Detaljert» visning (alt åpent); enkel visning testes i ux-e2e.cjs
+const DETAILED = () => { try { localStorage.setItem('kite-ui-prefs', JSON.stringify({ detailed: true, hints: true, guideHidden: false })); } catch {} };
 async function openAdv(p) { await p.evaluate(() => document.querySelectorAll('details.ov-adv').forEach((d) => { d.open = true; })); await p.waitForTimeout(200); }
 async function go(p, name) {
   const [m, s] = NAV[name] || [name];
-  await p.locator('nav.mainnav button', { hasText: m }).first().click();
+  await p.locator('nav.mainnav button', { hasText: m }).first().click(); await p.waitForTimeout(80);
   if (s) await p.locator('nav.subnav button', { hasText: s }).first().click();
-  if (m === 'Oversikt') { await p.waitForTimeout(200); await openAdv(p); }
+  if (m === 'Kart og rute') { await p.waitForTimeout(200); await openAdv(p); }
 }
 // TESTSTUBBER (kun i test): realistisk svarformat for tjenester sandkassen ikke når
 async function stubs(p) {
@@ -50,7 +52,7 @@ const tileText = (p, i, label) => p.locator('.daycard2').nth(i).locator('.tile',
 const setRange = async (p, sel, v) => { await p.locator(sel).fill(String(v)); await p.waitForTimeout(400); };
 (async () => {
   const b = await chromium.launch();
-  const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); await ctx.addInitScript(DETAILED);
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push('PAGEERR ' + e.message));
@@ -61,7 +63,7 @@ const setRange = async (p, sel, v) => { await p.locator(sel).fill(String(v)); aw
 
   // 1. Enkel navigasjon
   const nav = await p.locator('nav.mainnav button').allInnerTexts();
-  ok(nav.length === 6 && /Oversikt/.test(nav[0]) && /Dagplan/.test(nav[1]) && /Vær & kite/.test(nav[2]) && /Utstyr/.test(nav[3]) && /Eksport/.test(nav[4]) && /Innstillinger/.test(nav[5]), `1. fem hovedseksjoner (${nav.map((x) => x.replace(/\s+/g, ' ')).join(' | ')})`);
+  ok(nav.length === 7 && /Start/.test(nav[0]) && /Kart og rute/.test(nav[1]) && /Dagplan/.test(nav[2]) && /Vær & kite/.test(nav[3]) && /Utstyr/.test(nav[4]) && /Prosjekt/.test(nav[5]) && /Innstillinger/.test(nav[6]), `1. sju hovedseksjoner (${nav.map((x) => x.replace(/\s+/g, ' ')).join(' | ')})`);
   ok(await p.locator('.ov-hero').count() === 1 && await p.locator('.ov-day').count() >= 2 && await p.locator('.leaflet-container').count() === 1, '1. oversikt = kart + sammendrag + dagliste');
   await p.screenshot({ path: dir + '/v5-oversikt.png' });
 
@@ -116,7 +118,7 @@ const setRange = async (p, sel, v) => { await p.locator(sel).fill(String(v)); aw
   ok((await state(p)).compareIds.length >= 4, '7. varianter lagt i sammenligningen');
   await p.locator('button', { hasText: 'Lagre som nytt scenario' }).click(); await p.waitForTimeout(600);
   ok((await state(p)).plans.some((x) => x.name === 'Min testvariant'), '7. lagre som egen variant (navngitt)');
-  await p.selectOption('#plan-sel', 'plan-main'); await p.waitForTimeout(500);
+  await p.selectOption('#ctx-scenario', 'plan-main'); await p.waitForTimeout(500);
 
   // 8. Sluttpunkt i kartet
   await go(p, 'Kart & rute'); await p.waitForTimeout(1200);
@@ -207,10 +209,10 @@ const setRange = async (p, sel, v) => { await p.locator(sel).fill(String(v)); aw
 
   // 16. iPad og mobil: ingen horisontal scroll, store kontroller
   for (const [name, dev] of [['iPad', { ...devices['iPad (gen 7)'] }], ['iPad liggende', { ...devices['iPad (gen 7) landscape'] }], ['mobil', { ...devices['iPhone 13'] }]]) {
-    const c = await b.newContext({ ...dev, serviceWorkers: 'block' });
+    const c = await b.newContext({ ...dev, serviceWorkers: 'block' }); await c.addInitScript(DETAILED);
     const mp = await c.newPage(); await stubs(mp);
     const merr = []; mp.on('pageerror', (e) => merr.push(e.message));
-    await mp.goto(URL0, { waitUntil: 'domcontentloaded' }); await mp.waitForTimeout(2500);
+    await mp.goto(URL0 + '#oversikt', { waitUntil: 'domcontentloaded' }); await mp.waitForTimeout(2500);
     let worst = 0;
     for (const t of ['Kart & rute', 'Dagene', 'Kite og vind', 'Utstyr & offline', 'Innstillinger / Lagring']) {
       await go(mp, t); await mp.waitForTimeout(600);

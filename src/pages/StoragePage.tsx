@@ -1,3 +1,4 @@
+import { Advanced } from '../components/ux';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '../state/store';
 import { useSave, estimate, requestPersistence, flush, switchProject, hydrate } from '../storage/persistence';
@@ -132,7 +133,7 @@ export default function StoragePage() {
 
   return (
     <div className="page">
-      <Card title="INNSTILLINGER / LAGRING" className="wide" right={<Badge s={save.state === 'saved' ? 'GRØNN' : save.state === 'failed' || save.state === 'unavailable' ? 'RØD' : 'GUL'}>{({ loading: 'LASTER', saved: 'LAGRET', saving: 'LAGRER', unsaved: 'ULAGREDE ENDRINGER', warning: 'LAGRINGSVARSEL', failed: 'LAGRING FEILET', unavailable: 'LAGRES IKKE' } as const)[save.state]}</Badge>}>
+      <Card title="Lagring" className="wide" right={<Badge s={save.state === 'saved' ? 'GRØNN' : save.state === 'failed' || save.state === 'unavailable' ? 'RØD' : 'GUL'}>{({ loading: 'LASTER', saved: 'LAGRET', saving: 'LAGRER', unsaved: 'ULAGREDE ENDRINGER', warning: 'LAGRINGSVARSEL', failed: 'LAGRING FEILET', unavailable: 'LAGRES IKKE' } as const)[save.state]}</Badge>}>
         <div className="summary">
           <div><span>Siste lagring</span><b>{fmtTime(save.lastSavedAt)}</b></div>
           <div><span>Siste sikkerhetskopi</span><b>{fmtTime(save.lastBackupAt)}</b></div>
@@ -225,10 +226,11 @@ export default function StoragePage() {
       </Card>
 
       <Card title="Prosjekter">
-        <p className="small">Du har {u?.projects.length ?? 0} prosjekt(er). Opprett, åpne, dupliser, gi nytt navn, arkiver og slett under <button className="link" onClick={() => useStore.getState().setTab('prosjekter')}>Oversikt → Prosjekt</button>.</p>
+        <p className="small">Du har {u?.projects.length ?? 0} prosjekt(er). Opprett, åpne, dupliser, gi nytt navn, arkiver og slett under <button className="link" onClick={() => useStore.getState().setTab('prosjekter')}>Prosjekt → Prosjektet</button>.</p>
         <ul className="small list">{u?.projects.map((p) => <li key={p.id}>{p.name} {p.id === pid && <Badge s="GRØNN">aktivt</Badge>} · {kb(p.size)}</li>)}</ul>
       </Card>
 
+      <Advanced className="wide" title="Bilder og vedlegg" hint="bilder lagret i prosjektet">
       <Card title={`Bilder og vedlegg (${images.length})`} className="wide">
         {unused.length > 0 && (
           <p className="small warn">{unused.length} fil(er) brukes ikke av noe prosjekt eller noen kopi ({kb(unused.reduce((a, i) => a + i.size, 0))}).
@@ -262,7 +264,9 @@ export default function StoragePage() {
         </div>
         <p className="small muted">Bilder skaleres til maks 1600 px (JPEG) med 240 px miniatyr og lagres som Blob. Samme bilde lastet opp flere ganger lagres én gang.</p>
       </Card>
+      </Advanced>
 
+      <Advanced className="wide" title="Hurtigbuffer" hint="data som kan hentes på nytt">
       <Card title="Hurtigbuffer (kan hentes på nytt)">
         <ul className="small list">
           {u?.caches.map((c) => (
@@ -279,7 +283,9 @@ export default function StoragePage() {
           <li>Simuleringsresultater: lagres ikke (beregnes på nytt) – ingenting å rydde.</li>
         </ul>
       </Card>
+      </Advanced>
 
+      <Advanced className="wide" title="Flytting fra gammel lagring" hint="kun for eldre versjoner">
       <Card title="Flytting fra gammel lagring (localStorage)">
         {!mig ? <p className="small muted">Ingen informasjon.</p> : mig.status === 'none' ? <p className="small">Ingen gammel plan funnet – ingenting å flytte.</p> : (
           <>
@@ -298,6 +304,7 @@ export default function StoragePage() {
           </div>
         )}
       </Card>
+      </Advanced>
 
       {confirm && (
         <div className="modal" role="dialog" aria-modal="true">

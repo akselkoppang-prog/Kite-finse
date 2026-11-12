@@ -1,3 +1,4 @@
+import { Advanced, NextStep } from '../components/ux';
 import { useState } from 'react';
 import { safeUrl } from '../lib/html';
 import { useStore } from '../state/store';
@@ -128,7 +129,7 @@ export default function TasksPage() {
         </div>
         {byCat.length > 0 && <p className="small muted">{byCat.map((x) => `${x.c}: ${kr(x.sum)}`).join(' · ')}</p>}
         <table className="cmptable small">
-          <tbody>{st.expenses.map((e) => <tr key={e.id}><td>{e.text}</td><td>{e.cat}</td><td>{kr(e.amount)}</td><td>{e.planned ? 'planlagt' : e.paidBy ? `betalt av ${name(e.paidBy)}` : 'betalt'}</td><td><button className="link danger" onClick={() => st.set({ expenses: st.expenses.filter((x) => x.id !== e.id) })}>✕</button></td></tr>)}</tbody>
+          <tbody>{st.expenses.map((e) => <tr key={e.id}><td>{e.text}</td><td>{e.cat}</td><td>{kr(e.amount)}</td><td>{e.planned ? 'planlagt' : e.paidBy ? `betalt av ${name(e.paidBy)}` : 'betalt'}</td><td><button className="link danger" onClick={() => confirm(`Slette utgiften «${e.text}»?`) && st.set({ expenses: st.expenses.filter((x) => x.id !== e.id) })}>✕</button></td></tr>)}</tbody>
         </table>
         <div className="row small">
           <input placeholder="Utgift" value={ne.text} onChange={(e) => setNe({ ...ne, text: e.target.value })} />
@@ -140,11 +141,13 @@ export default function TasksPage() {
         </div>
       </Card>
 
+      <Advanced className="wide" title="Dokumenter og lenker" hint="avtaler, kart, bestillinger">
       <Card title="Dokumenter og lenker">
-        {st.documents.map((d) => <div key={d.id} className="row small">{safeUrl(d.url) ? <a href={safeUrl(d.url)} target="_blank" rel="noreferrer">{d.name}</a> : <span>{d.name}</span>} <span className="muted">{d.note}</span> <button className="link danger" onClick={() => st.set({ documents: st.documents.filter((x) => x.id !== d.id) })}>✕</button></div>)}
+        {st.documents.map((d) => <div key={d.id} className="row small">{safeUrl(d.url) ? <a href={safeUrl(d.url)} target="_blank" rel="noreferrer">{d.name}</a> : <span>{d.name}</span>} <span className="muted">{d.note}</span> <button className="link danger" onClick={() => confirm(`Fjerne «${d.name}» fra dokumentene?`) && st.set({ documents: st.documents.filter((x) => x.id !== d.id) })}>✕</button></div>)}
         <DocAdd />
         <p className="small muted">Personlige notater og kontakter ligger under Prosjekt.</p>
       </Card>
+      </Advanced>
     </div>
   );
 }
@@ -157,6 +160,7 @@ function DocAdd() {
       <input placeholder="Navn (f.eks. Forsikringsbevis)" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} />
       <input placeholder="https://…" value={d.url} onChange={(e) => setD({ ...d, url: e.target.value })} />
       <button className="btn small" disabled={!d.name || !/^https?:\/\//.test(d.url)} onClick={() => { st.set({ documents: [...st.documents, { id: uid('doc'), name: d.name, url: d.url }] }); setD({ name: '', url: '' }); }}>Legg til</button>
+      <NextStep to="eksport">Eksporter planen</NextStep>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { Advanced } from '../components/ux';
 import { useEffect, useState } from 'react';
 import { readErrors, onErrors, clearErrors } from '../lib/errlog';
 import { APP_VERSION, BUILD, versionLine } from '../lib/version';
@@ -162,6 +163,7 @@ export default function SourcesPage() {
           </table>
         </div>
       </Card>
+      <Advanced className="wide" title="Konfigurer NVE-tjenester" hint="for avanserte brukere">
       <Card title="Konfigurer NVE-tjenester">
         <WmsConfigurator which="nve" label="NVE Vannkraft WMS (kartlag)" candidates={SOURCES['nve-vannkraft-wms'].urls} />
         <WmsConfigurator which="skred" label="NVE Bratthet / snøskred WMS (kartlag)" candidates={SOURCES['nve-skred-wms'].urls} />
@@ -171,6 +173,8 @@ export default function SourcesPage() {
           <label className="small">Innsjødatabase MapServer<input value={lake} placeholder={SOURCES['nve-innsjo-rest'].urls[0]} onChange={(e) => { setLake(e.target.value); e.target.value ? localStorage.setItem('kite.nveBase.lake', e.target.value) : localStorage.removeItem('kite.nveBase.lake'); }} /></label>
         </div>
       </Card>
+      </Advanced>
+      <Advanced className="wide" title="Kilder som ikke er integrert">
       <Card title="Ikke integrert (mangler åpent API / ikke funnet)">
         <ul className="small">
           <li><b>DNT / UT.no</b> – hytteinfo og åpningstider. Lenke: <a href="https://ut.no" target="_blank" rel="noreferrer">ut.no</a>. Plassholder: hytter hentes som stedsnavn fra Kartverket.</li>
@@ -180,6 +184,8 @@ export default function SourcesPage() {
           <li><b>Mobildekning</b>: operatørenes dekningskart – ikke integrert.</li>
         </ul>
       </Card>
+      </Advanced>
+      <Advanced className="wide" title="Kategorier i appen">
       <Card title="Kategorier i appen">
         <ol className="small">
           <li><b>Kartdata</b>: Kartverket/NVE/MET slik tjenesten returnerer det.</li>
@@ -189,6 +195,7 @@ export default function SourcesPage() {
           <li><b>Sjekk selv</b>: forhold du må kontrollere (åpningstider, brøyting, Krossobanen, produsentdata).</li>
         </ol>
       </Card>
+      </Advanced>
     </div>
   );
 }

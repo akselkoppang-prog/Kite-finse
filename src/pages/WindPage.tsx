@@ -1,3 +1,4 @@
+import { Advanced } from '../components/ux';
 import { useState } from 'react';
 import { useStore } from '../state/store';
 import { useActiveRoute, useTerrain, useWind } from '../state/derived';
@@ -114,6 +115,7 @@ export default function WindPage() {
         </p>
       </Card>
 
+      <Advanced className="wide" title="Ruter rangert for valgt vind" hint="hvilken rute passer best for vindretningen">
       <Card title={`Ruter rangert for vind fra ${s.windFrom}`} right={<Kind k="beregnet" />}>
         {ranked.length === 0 && <p className="warn small">Ingen ruter er vannkontrollert uten røde kryssinger ennå. Alternative ruter kan ikke anbefales før vann er kontrollert (Kart → Hent ekte data).</p>}
         <ol>
@@ -125,6 +127,7 @@ export default function WindPage() {
         </ol>
         <p className="muted small">En gunstig vindretning gjør ikke en rute trygg. Se Sikkerhet.</p>
       </Card>
+      </Advanced>
 
       <Card title="Prognose i dag langs ruten (MET Locationforecast)" right={<button className="btn small" onClick={loadForecast} disabled={loading || !route}>{loading ? 'Henter…' : 'Hent prognose nå'}</button>} className="wide">
         <p className="small warn">

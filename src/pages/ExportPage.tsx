@@ -64,6 +64,7 @@ export default function ExportPage() {
       const snap = takeSnapshot({ planId: plan.id, routeId: effRouteId, prefs }, ok);
       const res = await fn(snap);
       setLog((l) => [`✓ ${res}`, ...l].slice(0, 8));
+      useStore.getState().log('annet', `Eksport: ${res}`);
     } catch (e) {
       setLog((l) => [`❌ ${what}: ${(e as Error).message}`, ...l].slice(0, 8));
     } finally {

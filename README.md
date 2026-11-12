@@ -21,6 +21,21 @@ Krever Node 18+. Ingen API-nøkler trengs (per nov. 2026).
 **GitHub Pages:** workflowen `.github/workflows/pages.yml` bygger og publiserer ved push til `main`.
 Slå på Pages i repoets innstillinger (Settings → Pages → Source: GitHub Actions).
 
+## Brukervennlighet – enkel som standard, kraftig ved behov
+
+**Struktur (7 hovedvalg):** 🏠 **Start** (kom i gang + status) · 🗺️ **Kart og rute** (kart, vann og is) · 📅 **Dagplan** (dag for dag, overnatting, scenarioer, kalender og sol, grovplan og plan B) · 🌬️ **Vær & kite** (vær langs ruten, vind i dag, kitevalg, simulator, kitedatabase) · 🎒 **Utstyr & mat** (pakkeliste, mat og vann, sikkerhet) · 📁 **Prosjekt** (prosjektet, oppgaver og team, eksport og deling) · ⚙️ **Innstillinger**. Hele strukturen og forklaringen til hver side ligger ett sted: `src/lib/ux/nav.ts`.
+
+- **Start:** ti planleggingssteg med status regnet ut fra prosjektet (navn/mål, rute, avreise, overnatting, kites, pakkeliste, mat, team, værmelding, eksport) og en «Neste steg»-knapp. Nye prosjekter åpner her.
+- **Alltid synlig:** prosjektet (øverst til venstre) og **scenario-velgeren** i linjen under menyen – bytt scenario hvor som helst. Hver side sier om den gjelder *scenarioet* eller *hele prosjektet*.
+- **Hver side** har én setning om hva den er til (kan skjules med «Skjul hjelp»), og «Neste steg» nederst der det er naturlig.
+- **Enkel / Detaljert:** i enkel visning er detaljer, beregninger og avanserte valg lukket bak ▸-paneler (samme utseende overalt); detaljert visning åpner alt. Eksempler: vær = vind, kast, temperatur og farer (nedbør, sikt, time for time og leverandørsammenligning i detaljer); pakkeliste = avkryssing og mangler (vekt, antall, eier, bæremåte i detaljert); mat = måltider og handleliste (protein, vekt, mat igjen og maler i detaljer); dagkort = tider og innstillinger («Slik er dagen regnet ut» i detaljer); kartlag = de seks vanligste (resten under «Flere kartlag»).
+- **Navigasjon:** nettleserens tilbake-knapp virker (også på mobil), adresser som `#mat` eller `#vaer` åpner riktig side, og «← Tilbake» vises når du har hoppet til en annen seksjon.
+- **Hjelp:** fagord (quiver, TWA, VMG, kast, hovedplan …) forklares ved trykk; ordliste på Start. Tomme sider forklarer hva du kan gjøre og har knapp dit.
+- **Sikkerhet mot feiltrykk:** sletting av rutepunkter, markører, utstyr, utgifter, dokumenter, reiseplaner, kalibreringsspor og offline-kart ber om bekreftelse.
+- Visningsvalgene (enkel/detaljert, hjelp, skjult kom-i-gang) er innstillinger for enheten (localStorage) – ikke prosjektdata, og påvirker ingen beregninger.
+
+Test: `tests/e2e/ux-e2e.cjs` (ny bruker, alle sider har forklaring, tilbake/lenker, scenario-velger, enkel/detaljert, lagring, bekreftelser, hjelp, mobil). De eldre suitene kjører i detaljert visning.
+
 ## Versjon og kvalitetssikring
 
 **Versjon: `ÅÅÅÅ.MM.DD.BYGG`** (UTC-dato + løpenummer som starter på 001 hver dag), f.eks. `2026.11.10.001`, `2026.11.10.002`, `2026.11.11.001`.

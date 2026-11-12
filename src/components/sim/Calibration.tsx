@@ -60,7 +60,7 @@ export default function Calibration() {
                   <td>{t.stats.netProgressKmh.toFixed(1)} km/t</td>
                   <td>{t.stats.bins?.filter((b) => b.n).map((b) => <div key={b.label}>{b.label}: {b.kmh.toFixed(1)} / {b.vmgKmh.toFixed(1)} (n={b.n})</div>) ?? '– (oppgi vindretning)'}</td>
                   <td>{t.stats.modelRatio ? `${t.stats.modelRatio.toFixed(2)} (n=${t.stats.modelN})` : '–'}</td>
-                  <td><button className="link danger" onClick={() => s.set({ calibTracks: s.calibTracks.filter((x) => x.id !== t.id) })}>slett</button></td>
+                  <td><button className="link danger" onClick={() => confirm(`Slette kalibreringssporet «${t.meta.name}»?`) && s.set({ calibTracks: s.calibTracks.filter((x) => x.id !== t.id) })}>slett</button></td>
                 </tr>
               ))}
             </tbody>

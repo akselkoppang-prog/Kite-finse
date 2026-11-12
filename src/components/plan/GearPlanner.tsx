@@ -1,3 +1,5 @@
+import { Advanced } from '../ux';
+import { useUiPrefs } from '../../state/uiprefs';
 import { useState } from 'react';
 import { useStore } from '../../state/store';
 import { useExpedition, useInsights, updatePlan } from '../../state/expedition';
@@ -23,6 +25,7 @@ export default function GearPlanner() {
   const upd = (id: string, p: Partial<GearItem>) => setList((l) => ({ ...l, items: l.items.map((g) => (g.id === id ? { ...g, ...p } : g)) }));
   const add = (name: string, cat: string, kg?: number, extra: Partial<GearItem> = {}) => setList((l) => ({ ...l, items: [...l.items, { id: uid('gear'), name, cat, kg, qty: 1, owner: 'felles', carry: cat === 'Klær' ? 'kropp' : 'pulk', packed: false, tags: autoTags(name), ...extra }] }));
   const t = ins.gear;
+  const detailed = useUiPrefs((p) => p.detailed);
   const cats = [...new Set([...GEAR_CATS, ...(list?.items.map((g) => g.cat) ?? [])])].filter((c) => list?.items.some((g) => g.cat === c));
   const owners = [{ id: 'felles', name: 'Felles' }, ...st.team.map((m) => ({ id: m.id, name: m.name }))];
 
@@ -38,7 +41,13 @@ export default function GearPlanner() {
 
   if (!list) return null;
   return (
-    <Card title={`Utstyr – «${plan.name}»`} className="wide gearplanner">
+    <Card title={`Pakkeliste – «${plan.name}»`} className={`wide gearplanner ${detailed ? '' : 'gear-simple'}`}>
+      <div className="row gear-summary">
+        <span className="gs-pct"><b>{Math.round(t.packedPct * 100)} %</b> pakket</span>
+        <span className="guide-bar" aria-hidden="true"><i style={{ width: `${Math.round(t.packedPct * 100)}%` }} /></span>
+        <span className="small muted">{t.count} ting · {kg1(t.pulkKg)} i pulkene · liste «{list.name}»</span>
+      </div>
+      <Advanced title="Utstyrslister" hint="bytt, kopier eller gi listen nytt navn">
       <div className="pt-row">
         <label className="pt-field">Utstyrsliste for scenarioet
           <select id="gear-list" value={list.id} onChange={(e) => updatePlan((p) => ({ ...p, gearListId: e.target.value }))}>
@@ -54,7 +63,8 @@ export default function GearPlanner() {
         </div>
       </div>
       <p className="small muted">Listen brukes av: {usedBy.join(', ') || '–'}. {usedBy.length > 1 ? 'Endringer gjelder alle disse – lag en kopi for å endre bare dette scenarioet.' : ''}</p>
-
+      </Advanced>
+      <Advanced title="Vekt og effekt på fremdriften" hint="kg i pulk og på kropp, og hvor mye vekten forsinker dere">
       <div className="ov-grid gear-tiles">
         <div><span>I pulkene</span><b>{kg1(t.pulkKg)}</b><small>{ins.people > 1 ? `${kg1(t.pulkKg / ins.people)} per pulk` : 'felles + personlig'}</small></div>
         <div><span>På kroppen</span><b>{kg1(t.bodyKg)}</b></div>
@@ -68,12 +78,14 @@ export default function GearPlanner() {
         {' '}<button className="link" onClick={measure}>Hva betyr 5 kg mer?</button>
       </p>
       {effect && <p className="small msg">{effect}</p>}
+      </Advanced>
 
       {ins.advice.length > 0 && (
         <div className="advice">
           <h4>Anbefalinger for dette scenarioet</h4>
+          {!detailed && ins.advice.filter((a) => a.level === 'mangler' || a.level === 'uegnet').length === 0 && <p className="small ok">Ingenting mangler for forholdene i planen.</p>}
           <p className="small muted">Basert på {ins.nights.length} netter ({[...new Set(ins.gearCtx.nightKinds.map((k) => k ?? 'ikke valgt'))].join(', ') || '–'}), ned mot {Math.round(ins.minTempC)} °C{ins.maxGust != null ? `, kast opptil ${Math.round(ins.maxGust)} m/s` : ''}, {ins.people} person(er){ins.gearCtx.steepTerrain ? ', bratt terreng' : ''}{ins.gearCtx.waterCrossings ? `, ${ins.gearCtx.waterCrossings} vannkryssinger` : ''}.</p>
-          {ins.advice.map((a) => (
+          {ins.advice.filter((a) => detailed || a.level === 'mangler' || a.level === 'uegnet').map((a) => (
             <div key={a.key} className={`adv adv-${a.level}`}>
               <span className={`lv ${a.level === 'mangler' ? 'lv-viktig' : a.level === 'uegnet' ? 'lv-advarsel' : 'lv-info'}`}>{LEVEL_TEXT[a.level]}</span>
               <b>{a.text}</b> <span className="small muted">– {a.why}</span>
@@ -97,18 +109,19 @@ export default function GearPlanner() {
                 {owners.length > 1 && <select value={g.owner ?? 'felles'} onChange={(e) => upd(g.id, { owner: e.target.value })} aria-label="Eier">{owners.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>}
                 {/sovepose/i.test(g.name) && <input className="qty" type="number" value={g.ratingC ?? ''} placeholder="°C" onChange={(e) => upd(g.id, { ratingC: e.target.value === '' ? undefined : +e.target.value })} aria-label="Komforttemperatur" title="Komforttemperatur °C" />}
                 {/\btelt\b|stormtelt/i.test(g.name) && <input className="qty" type="number" min={1} value={g.capacity ?? ''} placeholder="pers" onChange={(e) => upd(g.id, { capacity: e.target.value === '' ? undefined : +e.target.value })} aria-label="Personer" title="Plass til (personer)" />}
-                <button className="link danger" onClick={() => setList((l) => ({ ...l, items: l.items.filter((x) => x.id !== g.id) }))} aria-label="Slett">✕</button>
+                <button className="link danger" onClick={() => confirm(`Fjerne «${g.name}» fra pakkelisten?`) && setList((l) => ({ ...l, items: l.items.filter((x) => x.id !== g.id) }))} aria-label={`Fjern ${g.name}`} title="Fjern fra listen">✕</button>
               </div>
             ))}
           </div>
         ))}
       </div>
+      {!detailed && <p className="small muted">Antall, vekt, eier og bæremåte vises i <b>Detaljert</b> visning (knapp øverst).</p>}
       <div className="row">
         <select id="gear-new-cat" value={newItem.cat} onChange={(e) => setNewItem({ ...newItem, cat: e.target.value })} aria-label="Kategori">{GEAR_CATS.map((c) => <option key={c}>{c}</option>)}</select>
         <input id="gear-new-name" placeholder="Nytt utstyr" value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
         <input id="gear-new-kg" type="number" step="0.05" placeholder="kg" value={newItem.kg} onChange={(e) => setNewItem({ ...newItem, kg: e.target.value })} style={{ width: 80 }} />
         <button className="btn small" disabled={!newItem.name} onClick={() => { add(newItem.name, newItem.cat, newItem.kg === '' ? undefined : +newItem.kg); setNewItem({ ...newItem, name: '', kg: '' }); }}>Legg til</button>
-        <button className="btn small ghost" onClick={() => setList((l) => ({ ...l, items: l.items.map((g) => ({ ...g, packed: false })) }))}>Nullstill pakket</button>
+        <button className="btn small ghost" onClick={() => confirm('Fjerne alle avkryssinger for «pakket»? Selve listen beholdes.') && setList((l) => ({ ...l, items: l.items.map((g) => ({ ...g, packed: false })) }))}>Nullstill pakket</button>
       </div>
       {st.team.length > 1 && (
         <p className="small muted">Per person: {owners.slice(1).map((o) => `${o.name} ${kg1(t.perOwner[o.id] ?? 0)}`).join(' · ')} · felles {kg1(t.perOwner.felles ?? 0)}</p>

@@ -173,7 +173,7 @@ function pushHist(h: HistoryEntry[], kind: HistoryEntry['kind'], text: string): 
 
 export const useStore = create<State>()(
     (set, get) => ({
-      tab: 'oversikt',
+      tab: 'status',
       routes: [],
       activeRouteId: null,
       places: {},

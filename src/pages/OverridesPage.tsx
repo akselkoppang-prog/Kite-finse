@@ -1,3 +1,4 @@
+import { Advanced } from '../components/ux';
 import { useStore } from '../state/store';
 import { useActiveRoute, useBarrierCheck } from '../state/derived';
 import { overrideState, reviewPending } from '../lib/analysis/overrides';
@@ -51,6 +52,7 @@ export default function OverridesPage() {
         <p className="small muted">NVE-data hentet {fmtTime(check.hydroAt)} / {fmtTime(check.lakesAt)}.</p>
       </Card>
 
+      <Advanced className="wide" title="Endringslogg" hint="alle endringer du har gjort">
       <Card title="Endringslogg">
         <div className="tablewrap" style={{ maxHeight: 360 }}>
           <table className="tbl small">
@@ -64,6 +66,7 @@ export default function OverridesPage() {
         </div>
         {s.history.length === 0 && <p className="small muted">Ingen endringer logget ennå.</p>}
       </Card>
+      </Advanced>
     </div>
   );
 }

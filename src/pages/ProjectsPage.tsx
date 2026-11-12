@@ -9,6 +9,7 @@ import { releaseImage } from '../storage/backup';
 import { PROJECT_ICONS, STATUS_TEXT, type ProjectStatus } from '../lib/project/meta';
 import { addDays } from '../lib/sun';
 import { Card, fmtTime } from '../components/ui';
+import { useUiPrefs } from '../state/uiprefs';
 
 const fmtD = (d?: string) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: 'numeric' }) : '–');
 
@@ -27,8 +28,9 @@ function ProjectDetails() {
   const [err, setErr] = useState('');
   const upd = (patch: Partial<typeof p>) => set({ project: { ...useStore.getState().project, ...patch } });
   const autoEnd = addDays(tripDate, days - 1);
+  const detailed = useUiPrefs((x) => x.detailed);
   return (
-    <Card title="Dette prosjektet" className="wide projdetails">
+    <Card title="Dette prosjektet" className={`wide projdetails ${detailed ? '' : 'pd-simple'}`} right={!detailed ? <span className="small muted">Bilde, ikon, status og notater: <b>Detaljert</b> visning</span> : undefined}>
       <div className="pd-grid">
         <div className="pd-cover">
           <Cover id={p.coverBlobId} icon={p.icon} big />
@@ -63,10 +65,10 @@ function ProjectDetails() {
             <label>Startdato<input id="proj-start" type="date" value={tripDate} onChange={(e) => e.target.value && set({ tripDate: e.target.value })} /></label>
             <label>Sluttdato<input id="proj-end" type="date" value={p.endDate ?? autoEnd} min={tripDate} onChange={(e) => upd({ endDate: e.target.value || undefined })} /><small className="muted">{p.endDate ? <button className="link" onClick={() => upd({ endDate: undefined })}>følg hovedplanen ({fmtD(autoEnd)})</button> : 'følger hovedplanen'}</small></label>
           </div>
-          <label>Status
+          {detailed && <><label>Status
             <div className="seg">{(Object.keys(STATUS_TEXT) as ProjectStatus[]).map((k) => <button key={k} className={`btn small ${p.status === k ? 'on' : ''}`} onClick={() => upd({ status: k })}>{STATUS_TEXT[k]}</button>)}</div>
           </label>
-          <label>Personlige notater<textarea id="proj-notes" rows={4} value={p.notes} onChange={(e) => upd({ notes: e.target.value })} placeholder="Tanker, avtaler, ting å huske …" /></label>
+          <label>Personlige notater<textarea id="proj-notes" rows={4} value={p.notes} onChange={(e) => upd({ notes: e.target.value })} placeholder="Tanker, avtaler, ting å huske …" /></label></>}
           <label>Kontakter og nødinformasjon (kommer med i PDF-en)<textarea id="proj-contacts" rows={3} value={p.contacts} onChange={(e) => upd({ contacts: e.target.value })} /></label>
         </div>
       </div>
@@ -141,7 +143,7 @@ export default function ProjectsPage() {
       <Card title={`Alle prosjekter (${list.length})`} className="wide" right={archived > 0 ? <label className="chk small"><input type="checkbox" checked={showArch} onChange={(e) => setShowArch(e.target.checked)} /> Vis arkiverte ({archived})</label> : undefined}>
         <p className="small muted">Hvert prosjekt har egne ruter, GPX, scenarioer, vind, kites, teltplasser, punkter, vann-godkjenninger, notater og eksportvalg. Å åpne et annet prosjekt lagrer det du har åpent først.</p>
         <div className="pgrid">
-          {visible.map((p) => <ProjectCard key={p.id} p={p} active={p.id === pid} onOpen={() => void run('Åpne', async () => { await switchProject(p.id); useStore.getState().set({ tab: 'oversikt' }); return `Åpnet «${p.name}».`; })} onAction={(a) => act(p, a)} />)}
+          {visible.map((p) => <ProjectCard key={p.id} p={p} active={p.id === pid} onOpen={() => void run('Åpne', async () => { await switchProject(p.id); useStore.getState().set({ tab: 'status' }); return `Åpnet «${p.name}».`; })} onAction={(a) => act(p, a)} />)}
         </div>
         {!nw.open ? (
           <div className="btns">
@@ -150,7 +152,7 @@ export default function ProjectsPage() {
               const f = e.target.files?.[0];
               e.target.value = '';
               if (!f) return;
-              void run('Import', async () => { const r = await importProject(f, 'new', pid); await switchProject(r.projectId); useStore.getState().set({ tab: 'oversikt' }); return `Importerte «${r.name}» som nytt prosjekt (${r.routes} ruter, ${r.images} bilder). Andre prosjekter er ikke endret.`; });
+              void run('Import', async () => { const r = await importProject(f, 'new', pid); await switchProject(r.projectId); useStore.getState().set({ tab: 'status' }); return `Importerte «${r.name}» som nytt prosjekt (${r.routes} ruter, ${r.images} bilder). Andre prosjekter er ikke endret.`; });
             }} /></label>
           </div>
         ) : (
@@ -162,7 +164,7 @@ export default function ProjectsPage() {
               <button className={`btn small ${nw.template === 'finse' ? 'on' : ''}`} onClick={() => setNw({ ...nw, template: 'finse' })}>Start med Finse–Rjukan-ruten</button>
             </div>
             <div className="btns">
-              <button id="new-proj-ok" className="btn" disabled={!nw.name.trim() || !!busy} onClick={() => void run('Nytt prosjekt', async () => { await createProject({ name: nw.name, description: nw.desc, template: nw.template }); setNw({ ...nw, open: false }); useStore.getState().set({ tab: 'oversikt' }); return `«${nw.name}» er opprettet og åpnet.${nw.template === 'tom' ? ' Importer en GPX under Oversikt → «Rute og data».' : ''}`; })}>Opprett og åpne</button>
+              <button id="new-proj-ok" className="btn" disabled={!nw.name.trim() || !!busy} onClick={() => void run('Nytt prosjekt', async () => { await createProject({ name: nw.name, description: nw.desc, template: nw.template }); setNw({ ...nw, open: false }); useStore.getState().set({ tab: 'status' }); return `«${nw.name}» er opprettet og åpnet.${nw.template === 'tom' ? ' Importer en GPX under Kart → panelet «Rute og data».' : ''}`; })}>Opprett og åpne</button>
               <button className="btn ghost" onClick={() => setNw({ ...nw, open: false })}>Avbryt</button>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import { Advanced, Term } from '../components/ux';
 import { useState } from 'react';
 import { useStore } from '../state/store';
 import { KITES, QUIVER_ADVICE, type Kite } from '../data/kites';
@@ -42,7 +43,7 @@ export default function KitePage() {
 
   return (
     <div className="page">
-      <Card title="Min quiver (du velger)" className="wide" right={<Kind k="sjekk-selv" />}>
+      <Card title={<>Min <Term k="quiver" /> (du velger)</>} className="wide" right={<Kind k="sjekk-selv" />}>
         <div className="row">
           <label className="small">Konfigurasjon
             <select id="quiver-sel" value={q.id} onChange={(e) => s.set({ activeQuiverId: e.target.value })}>
@@ -85,6 +86,7 @@ export default function KitePage() {
 
       <KiteSpecs />
 
+      <Advanced className="wide" title="Sammenlign quivers" hint="vinddekning for ulike kite-sett">
       <Card title="Sammenlign quivers – vinddekning" className="wide" right={<Kind k="beregnet" />}>
         <div className="tablewrap">
           <table className="tbl small cov">
@@ -104,6 +106,7 @@ export default function KitePage() {
         </div>
         <p className="small muted">Kolonner = middelvind m/s. Tallet = antall kites i quiveren med beregnet (eller ditt eget) vindu som dekker vinden, for {s.riderKg + s.pulkKg} kg på «{SNOW_MU[s.snow].text}». Hull (tomme ruter) betyr ingen passende kite etter modellen.</p>
       </Card>
+      </Advanced>
 
       <Card title="Forhold">
         <div className="form">
@@ -119,7 +122,7 @@ export default function KitePage() {
         <p className="small">Total last <b>{s.riderKg + s.pulkKg} kg</b>. Hovedretning ≈ SØ → vind fra {s.windFrom} gir kursvinkel <b>{Math.round(courseAngle)}°</b>.</p>
       </Card>
 
-      <Card title="Hurtigråd (enkel modell – se Ytelsessimulator for fysikkmodellen)" right={<label className="chk small"><input id="k-only" type="checkbox" checked={onlySelected} onChange={(e) => setOnlySelected(e.target.checked)} /> Kun min quiver</label>} className="wide">
+      <Card title="Hurtigråd (enkel modell – se Simulator for fysikkmodellen)" right={<label className="chk small"><input id="k-only" type="checkbox" checked={onlySelected} onChange={(e) => setOnlySelected(e.target.checked)} /> Kun min quiver</label>} className="wide">
         {pool.length === 0 && <p className="small warn">Ingen kites valgt i quiveren.</p>}
         <div className="kites">
           {verdicts.map((v, i) => (
@@ -152,6 +155,7 @@ export default function KitePage() {
         <p className="small warn">Rangeringen er rådgivende. Vinduene er en forenklet modell (trekk ∝ areal × vind², last ∝ vekt × friksjon), ikke produsentdata og ikke sikkerhetsgrenser.</p>
       </Card>
 
+      <Advanced className="wide" title="Faglige vurderinger" hint="bakgrunn for anbefalingene">
       <Card title="Faglige vurderinger (sammendrag)" className="wide">
         <div className="tablewrap">
           <table className="tbl small">
@@ -180,11 +184,14 @@ export default function KitePage() {
         </div>
         <p className="small muted">Kolonnene er <b>faglige vurderinger</b>. Dokumenterte spesifikasjoner med kilder står i kitedatabasen over. Ytelse per kite simuleres i «Ytelsessimulator».</p>
       </Card>
+      </Advanced>
 
+      <Advanced className="wide" title="Rådgivende quiver-forslag">
       <Card title="Rådgivende quiver-forslag" right={<Kind k="sjekk-selv" />}>
         <pre className="pre">{QUIVER_ADVICE}</pre>
         <p className="small">Valgt nå: {selectedKites.map((k) => `${k.size} m² ${k.name}`).join(', ') || 'ingen'}.</p>
       </Card>
+      </Advanced>
     </div>
   );
 }

@@ -157,7 +157,7 @@ function WaypointTable() {
                 <td className="muted" title={w.source}>{w.source.slice(0, 40)}</td>
                 <td>
                   <button className="link" onClick={() => s.focusOn(w.lat, w.lon, 15)}>vis</button>{' '}
-                  <button className="link danger" onClick={() => s.deleteWaypoint(route.id, w.id)}>slett</button>
+                  <button className="link danger" onClick={() => confirm(`Slette punktet «${w.name ?? 'uten navn'}» fra ruten «${route.name}»?`) && s.deleteWaypoint(route.id, w.id)}>slett</button>
                 </td>
               </tr>
             );

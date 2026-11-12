@@ -148,6 +148,7 @@ export default function WaypointPanel({ kind, id }: { kind: 'wp' | 'marker'; id:
             </>
           )}
           <button className="btn small danger" onClick={() => {
+            if (!confirm(`Slette ${wp ? 'rutepunktet' : 'markøren'} «${item.name ?? 'uten navn'}»?`)) return;
             if (wp && route) s.deleteWaypoint(route.id, wp.id);
             else if (mk) s.set({ markers: s.markers.filter((m) => m.id !== mk.id) });
             close();

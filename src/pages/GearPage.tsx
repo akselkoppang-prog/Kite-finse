@@ -1,3 +1,4 @@
+import { Advanced, NextStep } from '../components/ux';
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../state/store';
 import { useActiveRoute, useDayPlan, useProfile } from '../state/derived';
@@ -52,16 +53,12 @@ export default function GearPage() {
     <div className="page">
       <GearPlanner />
 
-      <Card title="Mat og brensel">
-        <p className="small">Matplanen lages per scenario (måltider per dag, kalorier, vekt, vann og brensel) under <button className="link" onClick={() => s.setTab('mat')}>Utstyr & planlegging → Mat og vann</button>. Vekten tas med i fremdriftsberegningen.</p>
-      </Card>
-
       <Card title="Nød og avbrudd">
         <ul className="small">
           {Object.values(s.places).filter((p) => p.role.includes('avbrudd') || p.role.includes('transport')).map((p) => (
             <li key={p.key}><button className="link" onClick={() => s.focusOn(p.lat, p.lon, 12)}>{p.name}</button> ({p.type}) · {fmtCoord(p)}{route ? ` · ${(Math.min(...route.waypoints.map((w) => haversine(w, p))) / 1000).toFixed(1)} km fra ruten` : ''}</li>
           ))}
-          {Object.keys(s.places).length === 0 && <li className="muted">Hent stedsnavn i Kart-fanen (steg 1).</li>}
+          {Object.keys(s.places).length === 0 && <li className="muted">Hent stedsnavn i Kart og rute → panelet «Rute og data».</li>}
           {s.markers.filter((m) => m.category === 'exit' || m.category === 'pickup').map((m) => (
             <li key={m.id}>🆘 <button className="link" onClick={() => s.focusOn(m.lat, m.lon, 13)}>{m.name}</button> (din {m.category === 'exit' ? 'nødutgang' : 'henteplass'}) · {fmtCoord(m)}</li>
           ))}
@@ -75,6 +72,7 @@ export default function GearPage() {
         </ul>
       </Card>
 
+      <Advanced className="wide" title="Offline-kart og hurtigeksport" hint="last ned kartfliser langs ruten, GPX, CSV og utskrift">
       <Card title="Offline og eksport" className="wide">
         <div className="btns">
           <button className="btn" onClick={async () => { await flush(); download(`finse-rjukan-prosjekt-${s.tripDate}.zip`, await exportZip(useSave.getState().projectId, useSave.getState().projectName, true), 'application/zip'); }}>Last ned hele prosjektet (ZIP inkl. bilder og NVE/DTM-buffer)</button>
@@ -101,11 +99,13 @@ export default function GearPage() {
             }
           }}>Last ned fliser langs ruten</button>
           <button className="btn small ghost" onClick={() => abort.current?.abort()}>Stopp</button>
-          <button className="btn small danger" onClick={async () => { await clearTiles(); setProg(null); setTiles(0); }}>Slett lagrede fliser</button>
+          <button className="btn small danger" onClick={async () => { if (!confirm('Slette alle lagrede kartfliser? Kartet virker da ikke offline før du laster ned på nytt.')) return; await clearTiles(); setProg(null); setTiles(0); }}>Slett lagrede fliser</button>
         </div>
         {prog && <><Progress f={(prog.done + prog.failed) / Math.max(1, prog.total)} /><div className="small">{prog.done} lagret · {prog.failed} feilet</div></>}
         <p className="small muted">Kartverkets cache-tjeneste er åpen (CC BY 4.0), men skal brukes med måte: verktøyet henter bare en smal korridor, maks 4000 fliser, i rolig takt. Offline-visning krever at siden er åpnet én gang med nett (service worker). NVE/MET-data må hentes før avreise og lagres i prosjektet.</p>
       </Card>
+      </Advanced>
+      <NextStep to="mat">Planlegg mat og vann</NextStep>
     </div>
   );
 }

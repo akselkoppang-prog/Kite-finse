@@ -9,6 +9,8 @@ import { hhmm, DAY_COLORS } from '../lib/sim/expedition';
 import { addDays } from '../lib/sun';
 import { cumulative, dirName, pointAt } from '../lib/geo';
 import type { Observation } from '../lib/weather/types';
+import { useUiPrefs } from '../state/uiprefs';
+import { Advanced, Empty, NextStep } from '../components/ux';
 import { Card } from '../components/ui';
 
 const fmtT = (iso?: string) => (iso ? new Date(iso).toLocaleString('nb-NO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '–');
@@ -17,7 +19,9 @@ const n1 = (v: number | null | undefined, u = '') => (v == null || !Number.isFin
 const lvlClass = { viktig: 'lv-viktig', advarsel: 'lv-advarsel', info: 'lv-info' } as const;
 
 function DayWeatherCard({ w, i, date, open }: { w: DayWx; i: number; date: string; open: boolean }) {
-  const [show, setShow] = useState(open);
+  const detailed = useUiPrefs((p) => p.detailed);
+  const [show, setShow] = useState(open && detailed);
+  const more = detailed || show;
   return (
     <article className="wxday" style={{ borderLeftColor: DAY_COLORS[i % DAY_COLORS.length] }}>
       <header className="wx-head">
@@ -32,11 +36,13 @@ function DayWeatherCard({ w, i, date, open }: { w: DayWx; i: number; date: strin
             <div><span>Snittvind</span><b>{n1(w.avgWind, ' m/s')}</b></div>
             <div><span>Maks kast</span><b className={w.maxGust != null && w.maxGust >= 15 ? 'warn' : ''}>{n0(w.maxGust, ' m/s')}</b></div>
             <div><span>Min temp / følt</span><b>{n0(w.minTemp, '°')} / {n0(w.minChill, '°')}</b></div>
+            {more && <>
             <div><span>Nedbør / snø</span><b>{n1(w.precipMm, ' mm')} / {n1(w.snowCm, ' cm')}</b></div>
             <div><span>Dårligste sikt</span><b>{w.minVis == null ? 'ukjent' : w.minVis >= 10000 ? 'god' : `${n1(w.minVis / 1000, ' km')}`}</b></div>
             <div><span>Motvind</span><b>{Math.round(w.headShare * 100)} %</b></div>
+            </>}
           </div>
-          <button className="link small" onClick={() => setShow(!show)}>{show ? 'Skjul time for time' : 'Vis time for time langs ruten'}</button>
+          <button className="link small" onClick={() => setShow(!show)}>{show ? 'Skjul detaljer' : 'Vis nedbør, sikt og time for time langs ruten'}</button>
           {show && (
             <div className="tablewrap">
               <table className="wxtable">
@@ -111,7 +117,13 @@ export default function VaerPage() {
   return (
     <div className="page vaerpage">
       <Card title="Vær langs ruten" className="wide" right={<span className="small muted">Scenario «{plan.name}» · avreise {new Date(`${date0}T12:00:00`).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}>
-        <p className="small muted">Prognoser hentes for punkter hver ~12 km langs ruten. Appen bruker været der og når simuleringen sier at dere er på ruten – ikke bare ved start.</p>
+        <p className="small muted">Prognoser hentes for punkter hver ~12 km langs ruten. Appen bruker været der og når dere etter planen er på ruten – ikke bare ved start.</p>
+        {!route && <Empty icon="🗺️" title="Ingen rute valgt" actions={<button className="btn small" onClick={() => st.setTab('oversikt')}>Gå til kartet</button>}>Værmeldingen hentes langs ruten. Velg eller last inn en rute først.</Empty>}
+        <div className="row small wx-status">
+          <span>Brukes nå: <b>{providerById(source).label}</b></span>
+          <span className="muted">· {st.weather[source] && st.weather[source].routeKey === key ? `oppdatert ${fmtT(st.weather[source].updatedAt ?? st.weather[source].fetchedAt)}` : 'ikke hentet for denne ruten'}</span>
+        </div>
+        <Advanced title={`Værleverandører (${sel.length} valgt)`} hint="velg hvilke prognoser som hentes og hvilken scenarioet bruker">
         <div className="provgrid">
           {PROVIDERS.map((p) => {
             const w = st.weather[p.id];
@@ -126,6 +138,7 @@ export default function VaerPage() {
             );
           })}
         </div>
+        </Advanced>
         <div className="btns">
           <button id="wx-fetch" className="btn primary" onClick={fetchAll} disabled={!!busy || !route || !sel.length}>{busy || 'Hent værdata langs ruten'}</button>
           {!anyForecastDay && fc.points && <button className="btn" onClick={useForecastAllDays}>Bruk prognosen alle dager i scenarioet</button>}
@@ -157,6 +170,7 @@ export default function VaerPage() {
       </Card>
 
       {compare.length > 0 && (
+        <Advanced className="wide" title="Sammenlign værleverandører" hint="samme scenario regnet med hver prognose">
         <Card title="Sammenlign leverandører" className="wide">
           <p className="small muted">Samme scenario regnet ut med hver leverandørs prognose. Store forskjeller = usikker prognose.</p>
           <div className="tablewrap">
@@ -174,6 +188,7 @@ export default function VaerPage() {
             </table>
           </div>
         </Card>
+        </Advanced>
       )}
 
       <Card title="Når er det best å reise?" className="wide">
@@ -207,8 +222,10 @@ export default function VaerPage() {
         )}
       </Card>
 
+      <Advanced className="wide" title="Målinger, Windy-kart og flere kilder" hint="observasjoner fra værstasjoner og interaktivt vindkart">
+      <div className="page-sub">
       <Card title="Siste observasjoner (målt)">
-        <p className="small muted">Målinger fra MET sine stasjoner nær ruten (Frost API). Krever gratis klient-ID fra frost.met.no – legges inn under Værmelding.</p>
+        <p className="small muted">Målinger fra MET sine stasjoner nær ruten (Frost API). Krever gratis klient-ID fra frost.met.no – legges inn under Vær & kite → Vind i dag.</p>
         <button className="btn small" disabled={!st.frostClientId || !route} onClick={async () => {
           setObsErr('');
           try {
@@ -230,6 +247,9 @@ export default function VaerPage() {
         {mid && <div className="btns"><button className="btn small" onClick={() => setWindy(!windy)}>{windy ? 'Skjul Windy-kart' : 'Vis Windy-kart'}</button><a className="btn small ghost" href={windyLink(mid)} target="_blank" rel="noreferrer">Åpne windy.com</a></div>}
         {windy && mid && <iframe className="windy" title="Windy vindkart" src={windyEmbed(mid)} loading="lazy" />}
       </Card>
+      </div>
+      </Advanced>
+      <NextStep to="vaerkite">Velg kite for hver dag</NextStep>
     </div>
   );
 }

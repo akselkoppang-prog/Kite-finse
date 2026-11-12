@@ -1,3 +1,4 @@
+import { Advanced, Empty, NextStep } from '../components/ux';
 import { useState } from 'react';
 import { useStore } from '../state/store';
 import { useExpedition, useInsights, assignCamp } from '../state/expedition';
@@ -88,8 +89,14 @@ export default function NightsPage() {
           })}
           {!ins.nights.length && <p className="small muted">Scenarioet er bare én dag – ingen overnatting.</p>}
         </div>
+        {ins.nights.length > 0 && !camps.length && (
+          <Empty icon="⛺" title="Ingen overnattingssteder lagt inn ennå" actions={<><button className="btn small primary" onClick={() => st.setTab('plan')}>Legg til fra dagplanen</button><button className="btn small" onClick={() => st.setTab('oversikt')}>Velg i kartet</button></>}>
+            På hvert dagkort under Dag for dag kan du trykke «+ Teltplass ved sluttpunktet» eller la appen foreslå steder ut fra terrenget. Du kan også trykke i kartet.
+          </Empty>
+        )}
       </Card>
 
+      <Advanced className="wide" title={`Rediger overnattingssteder (${st.camps.length})`} hint="type, antall plasser, påfyll, pris og hvilke scenarioer stedet gjelder">
       <Card title={`Overnattingssteder (${st.camps.length})`} className="wide">
         <p className="small muted">Legg til steder ved å klikke i kartet (Oversikt) eller med «+ Teltplass ved sluttpunktet» på dagkortene. Her setter du type, plass, påfyll og hvilke scenarioer stedet gjelder for.</p>
         <div className="tablewrap">
@@ -114,8 +121,12 @@ export default function NightsPage() {
         </div>
         {!st.camps.length && <p className="small muted">Ingen steder ennå.</p>}
       </Card>
+      </Advanced>
 
-      <CrossingEditor />
+      <Advanced className="wide" title={`Krysninger langs ruten (${st.crossings.length})`} hint="ferje, båt, bro, elv og is – ventetid regnes inn i dagens tid">
+        <CrossingEditor />
+      </Advanced>
+      <NextStep to="vaerkite">Velg kites</NextStep>
     </div>
   );
 }

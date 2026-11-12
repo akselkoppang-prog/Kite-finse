@@ -52,6 +52,6 @@ export function computeWarnings({ check, terrain, days, acks, overrides, tripDat
     } else w.push({ id: 'terreng-ikke-analysert', level: 'info', title: 'Terreng ikke analysert', text: 'Kjør terrenganalyse for helning, skredterreng og le.' });
     overrides.filter((o) => overrideState(o, tripDate) === 'aktiv' && reviewPending(o)).forEach((o) => w.push({ id: `review:${o.id}`, level: 'advarsel', title: `Gå gjennom godkjenningen av ${o.name}`, text: 'Du har bedt om en ny gjennomgang før avreise.', where: o.centroid }));
     days.forEach((d) => d.issues.forEach((t, i) => w.push({ id: `dag${d.day}:${i}:${t.slice(0, 20)}`, level: /Mangler/.test(t) ? 'viktig' : 'advarsel', title: `Dag ${d.day}`, text: t })));
-    if (/rjukan/i.test(destination)) w.push({ id: 'krossobanen', level: 'info', title: 'Krossobanen er stengt', text: 'Planlegg å gå ned fra Gvepseborg til Rjukan selv (se Utstyr & planlegging → Sikkerhet).' });
+    if (/rjukan/i.test(destination)) w.push({ id: 'krossobanen', level: 'info', title: 'Krossobanen er stengt', text: 'Planlegg å gå ned fra Gvepseborg til Rjukan selv (se Utstyr & mat → Sikkerhet).' });
     return w.map((x) => ({ ...x, ack: acks[x.id] })).sort((a, b) => ['viktig', 'advarsel', 'info'].indexOf(a.level) - ['viktig', 'advarsel', 'info'].indexOf(b.level));
 }

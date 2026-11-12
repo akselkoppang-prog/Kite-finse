@@ -12,7 +12,7 @@ const tile = fs.readFileSync(__dirname + '/testtile.png');
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
-  await p.goto(URL0); await p.waitForTimeout(3000);
+  await p.goto(URL0 + '#oversikt'); await p.waitForTimeout(3000);
   await p.reload(); await p.waitForTimeout(3500); // nå styrt av service workeren
   if (process.env.SWAP) {
     // gammel versjon har cachet fliser fra kartet → bytt til ny versjon (som et nytt deploy)

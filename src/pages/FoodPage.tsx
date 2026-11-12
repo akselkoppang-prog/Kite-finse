@@ -1,3 +1,5 @@
+import { Advanced, NextStep } from '../components/ux';
+import { useUiPrefs } from '../state/uiprefs';
 import { useState } from 'react';
 import { useStore } from '../state/store';
 import { useExpedition, useInsights, updatePlan } from '../state/expedition';
@@ -25,11 +27,13 @@ export default function FoodPage() {
   const date0 = plan.tripDate ?? st.tripDate;
   const [nf, setNf] = useState({ name: '', kcal: '', protein: '', fat: '', carbs: '', ml: '', packG: '' });
   const [tplEdit, setTplEdit] = useState<string | null>(null);
+  const detailed = useUiPrefs((p) => p.detailed);
   const maxKg = Math.max(1, ...f.remainingKgByDay);
 
   return (
     <div className="page">
       <Card title={`Mat og vann – «${plan.name}»`} className="wide">
+        <Advanced title="Forutsetninger" hint={`${fp.activity} · ${fp.reserveDays} reservedøgn · ${fp.waterLPerPersonDay} l vann og ${fp.fuelLPerPersonDay} l brensel per person/dag`}>
         <div className="pt-row">
           <label className="pt-field">Aktivitet
             <select id="food-activity" value={fp.activity} onChange={(e) => setFp((x) => ({ ...x, activity: e.target.value as Activity }))}>
@@ -41,13 +45,14 @@ export default function FoodPage() {
           <label className="pt-field">Brensel l/person/dag<input type="number" step={0.05} min={0} value={fp.fuelLPerPersonDay} onChange={(e) => setFp((x) => ({ ...x, fuelLPerPersonDay: +e.target.value }))} style={{ width: 80 }} /></label>
           <div className="pt-field">Personer<b>{f.people}</b><small className="muted">{st.team.length ? 'fra teamet' : <button className="link" onClick={() => st.setTab('oppgaver')}>legg til team</button>}</small></div>
         </div>
+        </Advanced>
         <div className="ov-grid food-tiles">
           <div><span>Behov per person/dag</span><b id="food-target">{n0(f.target)} kcal</b><small>{fp.activity}, ned mot {Math.round(ins.minTempC)} °C</small></div>
           <div><span>Matvekt totalt</span><b id="food-kg">{n1(f.totalKg)} kg</b><small>{f.totalDays} døgn × {f.people} pers.</small></div>
-          <div><span>Volum</span><b>{n1(f.totalL)} l</b></div>
+          {detailed && <div><span>Volum</span><b>{n1(f.totalL)} l</b></div>}
           <div><span>Vann per dag</span><b>{n1(f.waterLPerDay * f.people)} l</b><small>smeltes av snø</small></div>
           <div><span>Brensel</span><b>{n1(f.fuelL)} l</b><small>≈ {n1(f.fuelL * 0.75)} kg</small></div>
-          <div><span>Mat ved start</span><b>{n1(f.remainingKgByDay[0] ?? 0)} kg</b><small>{ins.load.source === 'utstyrsliste' ? 'regnes med i pulkvekten' : 'legg inn utstyrsvekter for å regne med i pulken'}</small></div>
+          {detailed && <div><span>Mat ved start</span><b>{n1(f.remainingKgByDay[0] ?? 0)} kg</b><small>{ins.load.source === 'utstyrsliste' ? 'regnes med i pulkvekten' : 'legg inn utstyrsvekter for å regne med i pulken'}</small></div>}
         </div>
         {f.shortDays.length > 0 && <p className="small warn">⚠️ Under 85 % av energibehovet: dag {f.shortDays.join(', ')}. Legg til mer energitett mat (nøtter, smør, sjokolade).</p>}
       </Card>
@@ -55,7 +60,7 @@ export default function FoodPage() {
       <Card title="Måltider dag for dag (per person)" className="wide">
         <div className="tablewrap">
           <table className="foodtable">
-            <thead><tr><th>Dag</th>{SLOTS.map((s) => <th key={s}>{SLOT_TEXT[s]}</th>)}<th>kcal</th><th>Protein</th><th>Vekt</th></tr></thead>
+            <thead><tr><th>Dag</th>{SLOTS.map((s) => <th key={s}>{SLOT_TEXT[s]}</th>)}<th>kcal</th>{detailed && <><th>Protein</th><th>Vekt</th></>}</tr></thead>
             <tbody>
               {Array.from({ length: f.totalDays }, (_, i) => {
                 const day = fp.days[i] ?? fp.days[fp.days.length - 1] ?? defaultDay();
@@ -74,8 +79,7 @@ export default function FoodPage() {
                       </td>
                     ))}
                     <td><div className="kbar"><i style={{ width: `${Math.min(100, (100 * n.kcal) / f.target)}%`, background: n.kcal < f.target * 0.85 ? 'var(--yellow)' : 'var(--green)' }} /><span>{n0(n.kcal)}</span></div></td>
-                    <td>{n0(n.protein)} g</td>
-                    <td>{n0(n.g)} g</td>
+                    {detailed && <><td>{n0(n.protein)} g</td><td>{n0(n.g)} g</td></>}
                   </tr>
                 );
               })}
@@ -83,15 +87,6 @@ export default function FoodPage() {
           </table>
         </div>
         <p className="small muted">Mål: {n0(f.target)} kcal per person per dag (aktivitet × kulde: +5 % per 10 °C under null, justert for kroppsvekt). Endringer gjelder bare dette scenarioet.</p>
-      </Card>
-
-      <Card title="Mat igjen underveis">
-        <div className="remain">
-          {f.remainingKgByDay.map((kg, i) => (
-            <div key={i} className="rbar"><span>Dag {i + 1}</span><i style={{ width: `${(100 * kg) / maxKg}%` }} /><b>{n1(kg)} kg</b></div>
-          ))}
-        </div>
-        <p className="small muted">Ved start av hver dag (hele gruppen). Påfyll ved overnattinger merket «påfyll» under Dagplan → Overnatting.</p>
       </Card>
 
       <Card title="Handleliste">
@@ -102,6 +97,19 @@ export default function FoodPage() {
         <p className="small muted">Inkluderer reservedøgn og alle personer.</p>
       </Card>
 
+      <Advanced title="Mat igjen underveis" hint="hvor mye mat dere har med ved start av hver dag">
+      <Card title="Mat igjen underveis">
+        <div className="remain">
+          {f.remainingKgByDay.map((kg, i) => (
+            <div key={i} className="rbar"><span>Dag {i + 1}</span><i style={{ width: `${(100 * kg) / maxKg}%` }} /><b>{n1(kg)} kg</b></div>
+          ))}
+        </div>
+        <p className="small muted">Ved start av hver dag (hele gruppen). Påfyll ved overnattinger merket «påfyll» under Dagplan → Overnatting.</p>
+      </Card>
+      </Advanced>
+
+
+      <Advanced className="wide" title="Måltidsmaler og matvarer" hint="rediger hva måltidene inneholder, legg til egne matvarer">
       <Card title="Måltidsmaler og matvarer" className="wide">
         <p className="small muted">Malene og matvarene deles av alle scenarioer i prosjektet.</p>
         <div className="tplgrid">
@@ -137,6 +145,8 @@ export default function FoodPage() {
           <button className="btn small" disabled={!nf.name || !nf.kcal} onClick={() => { const it: FoodItem = { id: uid('food'), name: nf.name, kcal: +nf.kcal, protein: +nf.protein || 0, fat: +nf.fat || 0, carbs: +nf.carbs || 0, ml: +nf.ml || 150, packG: nf.packG ? +nf.packG : undefined }; st.set({ foods: [...st.foods, it] }); setNf({ name: '', kcal: '', protein: '', fat: '', carbs: '', ml: '', packG: '' }); }}>Legg til</button>
         </div>
       </Card>
+      </Advanced>
+      <NextStep to="oppgaver">Team og oppgaver</NextStep>
     </div>
   );
 }

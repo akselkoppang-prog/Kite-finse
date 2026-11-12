@@ -17,7 +17,7 @@ export async function refreshWeather(route: Route, providerIds: string[], onProg
     if (!rw.points.length) errs.push(`${pr.short}: ${rw.errors[0] ?? 'ingen data'}`);
     const st = useStore.getState();
     const patch: Partial<State> = { weather: { ...st.weather, [id]: rw } };
-    // MET-data brukes også av eldre visninger (Værmelding-fanen)
+    // MET-data brukes også av eldre visninger (Vær & kite → Vind i dag)
     if (id === 'met' && rw.points.length) patch.routeForecast = { points: rw.points, fetchedAt: rw.fetchedAt };
     st.set(patch);
   }

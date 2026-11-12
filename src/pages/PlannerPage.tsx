@@ -5,6 +5,7 @@ import { hhmm, type DayOutcome } from '../lib/sim/expedition';
 import { addDays, daysBetween } from '../lib/sun';
 import { refreshWeather } from '../lib/weather/actions';
 import DayCard from '../components/plan/DayCard';
+import { NextStep } from '../components/ux';
 import { kiteShort } from '../components/plan/KiteChips';
 import { uid } from '../lib/geo';
 
@@ -66,11 +67,6 @@ export default function PlannerPage() {
               {plan.days.length > 1 && <button className="btn ghost" onClick={() => setDayCount(plan.days.length - 1)} aria-label="Fjern siste dag">−</button>}
             </div>
           </div>
-          <label className="pt-field">Scenario
-            <select id="plan-sel" value={plan.id} onChange={(e) => s.set({ activePlanId: e.target.value })}>
-              {s.plans.map((p) => <option key={p.id} value={p.id}>{p.id === s.mainPlanId ? '★ ' : ''}{p.name}</option>)}
-            </select>
-          </label>
           <div className="pt-field">&nbsp;
             <div className="btns">
               <button className="btn small" onClick={() => { const n = prompt('Navn på det nye scenarioet', `${plan.name} – variant`); if (n) { const id = savePlanAs(n); s.set({ compareIds: [...new Set([...s.compareIds, plan.id, id])] }); setMsg(`Lagret «${n}» som eget scenario. Du redigerer fortsatt «${plan.name}».`); } }}>Lagre som nytt scenario</button>
@@ -98,6 +94,7 @@ export default function PlannerPage() {
         {plan.days.map((d, i) => <DayCard key={d.id} i={i} day={d} out={days[i]} forecastAvailable={forecastAvailable} />)}
       </div>
 
+      <NextStep to="netter">Velg hvor dere sover</NextStep>
       <p className="small muted center">Vil du sammenligne scenarioer, gi dem nytt navn eller velge hovedplan? <button className="link" onClick={() => s.setTab('scenarier')}>Scenarioer og sammenligning →</button></p>
     </div>
   );

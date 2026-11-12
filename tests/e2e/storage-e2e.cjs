@@ -8,13 +8,15 @@ let fail = 0;
 const ok = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) fail++; };
 
 // v5-navigasjon: gamle fanenavn → hovedmeny + undermeny
-const NAV = { 'Kart & rute': ['Oversikt'], 'Overstyringer': ['Utstyr & planlegging', 'Vann-godkjenninger'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Avansert dagsfordeling'], 'Dagene': ['Dagplan', 'Dagene'], 'Kite og vind': ['Vær & kite', 'Kite og vind'], 'Utstyr & offline': ['Utstyr & planlegging', 'Utstyr'], 'Vær & vind': ['Vær & kite', 'Værmelding'], 'Sikkerhet': ['Utstyr & planlegging', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+const NAV = { 'Scenarioer': ['Dagplan', 'Scenarioer'], 'Prosjekt': ['Prosjekt', 'Prosjektet'], 'Eksport': ['Prosjekt', 'Eksport og deling'], 'Kart & rute': ['Kart og rute', 'Kart'], 'Overstyringer': ['Kart og rute', 'Vann og is'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Grovplan og plan B'], 'Dagene': ['Dagplan', 'Dag for dag'], 'Kite og vind': ['Vær & kite', 'Kitevalg'], 'Utstyr & offline': ['Utstyr & mat', 'Pakkeliste'], 'Mat': ['Utstyr & mat', 'Mat og vann'], 'Vær langs ruten': ['Vær & kite', 'Vær langs ruten'], 'Overnatting': ['Dagplan', 'Overnatting'], 'Status': ['Start'], 'Oppgaver': ['Prosjekt', 'Oppgaver og team'], 'Vær & vind': ['Vær & kite', 'Vind i dag'], 'Sikkerhet': ['Utstyr & mat', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+// Legacy-suitene tester funksjonalitet i «Detaljert» visning (alt åpent); enkel visning testes i ux-e2e.cjs
+const DETAILED = () => { try { localStorage.setItem('kite-ui-prefs', JSON.stringify({ detailed: true, hints: true, guideHidden: false })); } catch {} };
 async function openAdv(p) { await p.evaluate(() => document.querySelectorAll('details.ov-adv').forEach((d) => { d.open = true; })); await p.waitForTimeout(200); }
 async function go(p, name) {
   const [m, s] = NAV[name] || [name];
-  await p.locator('nav.mainnav button', { hasText: m }).first().click();
+  await p.locator('nav.mainnav button', { hasText: m }).first().click(); await p.waitForTimeout(80);
   if (s) await p.locator('nav.subnav button', { hasText: s }).first().click();
-  if (m === 'Oversikt') { await p.waitForTimeout(200); await openAdv(p); }
+  if (m === 'Kart og rute') { await p.waitForTimeout(200); await openAdv(p); }
 }
 const profile = path.join(dir, 'profile-a');
 const profileB = path.join(dir, 'profile-b');
@@ -72,7 +74,7 @@ async function bigJpeg(p, seed) {
 }
 
 (async () => {
-  let ctx = await chromium.launchPersistentContext(profile, { viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true });
+  let ctx = await chromium.launchPersistentContext(profile, { viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); await ctx.addInitScript(DETAILED);
   let p = ctx.pages()[0] || (await ctx.newPage());
   const errs = [];
   const watch = (pg) => { pg.on('pageerror', (e) => errs.push('PAGEERR ' + e.message)); pg.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|ERR_|net::|QuotaExceeded|Testfeil/.test(m.text())) errs.push(m.text()); }); };
@@ -101,7 +103,7 @@ async function bigJpeg(p, seed) {
     return { bytes: raw.length * 2 };
   });
   console.log(`(gammel plan i localStorage: ${(legacyInfo.bytes / 1048576).toFixed(1)} MB)`);
-  await p.goto(URL0, { waitUntil: 'domcontentloaded' }); await openAdv(p);
+  await p.goto(URL0 + '#oversikt', { waitUntil: 'domcontentloaded' }); await openAdv(p);
   await p.waitForSelector('.saveind', { timeout: 20000 });
   await p.waitForTimeout(1500);
   let d = proj(await dump(p));
@@ -191,7 +193,7 @@ async function bigJpeg(p, seed) {
 
   // ---- 10: lukk og åpne nettleseren ----
   await ctx.close();
-  ctx = await chromium.launchPersistentContext(profile, { viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true });
+  ctx = await chromium.launchPersistentContext(profile, { viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); await ctx.addInitScript(DETAILED);
   p = ctx.pages()[0] || (await ctx.newPage()); watch(p); await stubs(p);
   await p.goto(URL0, { waitUntil: 'domcontentloaded' }); await openAdv(p); await p.waitForSelector('.saveind', { timeout: 20000 }); await p.waitForTimeout(1200);
   d = proj(await dump(p));
@@ -267,7 +269,7 @@ async function bigJpeg(p, seed) {
   const act3 = finalState.routes.find((r) => r.id === finalState.activeRouteId);
 
   // ---- 14: importer i ren nettleserprofil ----
-  const ctxB = await chromium.launchPersistentContext(profileB, { viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
+  const ctxB = await chromium.launchPersistentContext(profileB, { viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); await ctxB.addInitScript(DETAILED);
   const pb = ctxB.pages()[0] || (await ctxB.newPage()); watch(pb); await stubs(pb);
   await pb.goto(URL0); await openAdv(pb); await pb.waitForSelector('.saveind'); await pb.waitForTimeout(800);
   await go(pb, 'Innstillinger / Lagring'); await pb.waitForTimeout(400);
@@ -285,7 +287,7 @@ async function bigJpeg(p, seed) {
 
   // ---- 17b: avbrutt migrering kjøres trygt på nytt ----
   fs.rmSync(path.join(dir, 'profile-c'), { recursive: true, force: true });
-  const ctxC = await chromium.launchPersistentContext(path.join(dir, 'profile-c'), { serviceWorkers: 'block' });
+  const ctxC = await chromium.launchPersistentContext(path.join(dir, 'profile-c'), { serviceWorkers: 'block' }); await ctxC.addInitScript(DETAILED);
   const pc = ctxC.pages()[0] || (await ctxC.newPage()); await stubs(pc);
   await pc.goto(URL0 + 'sw.js'); await openAdv(pc);
   await pc.evaluate(() => localStorage.setItem('kite.plan.v1', JSON.stringify({ state: { routes: [{ id: 'r', name: 'R', kind: 'egen', color: '#f00', description: '', visible: true, createdAt: '', updatedAt: '', waypoints: [{ id: 'a', lat: 60, lon: 7.5, kind: 'via', source: 't', dataKind: 'forslag' }, { id: 'b', lat: 60.1, lon: 7.6, kind: 'via', source: 't', dataKind: 'forslag' }] }], activeRouteId: 'r', tripDate: '2027-04-15' } })));

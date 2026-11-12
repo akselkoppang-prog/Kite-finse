@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useStore, type Tab } from './state/store';
 import { loadInitialGpx } from './lib/actions';
 import MapView from './components/MapView';
@@ -17,6 +17,8 @@ import { useBlobUrl } from './storage/blobs';
 import ErrorBoundary, { lazyPage } from './components/ErrorBoundary';
 import { UpdateBanner } from './components/UpdateBanner';
 import { versionLine, APP_VERSION } from './lib/version';
+import { SECTIONS, mainOf, tabLabel } from './lib/ux/nav';
+import { PageIntro } from './components/ux';
 
 // sider som ikke trengs ved oppstart lastes først når de åpnes (raskere start, særlig på iPad)
 const PlannerPage = lazyPage(() => import('./pages/PlannerPage'));
@@ -42,33 +44,59 @@ const StatusPage = lazyPage(() => import('./pages/StatusPage'));
 const TasksPage = lazyPage(() => import('./pages/TasksPage'));
 const TechDetails = lazyPage(() => import('./components/TechDetails'));
 
-type Main = 'oversikt' | 'plan' | 'vaerkite' | 'utstyr' | 'eksport' | 'innstillinger';
-const SECTIONS: { id: Main; label: string; short?: string; icon: string; subs: [Tab, string][] }[] = [
-  { id: 'oversikt', label: 'Oversikt', icon: '🗺️', subs: [['oversikt', 'Kart og rute'], ['status', 'Status'], ['oppgaver', 'Oppgaver og team'], ['prosjekter', 'Prosjekt']] },
-  { id: 'plan', label: 'Dagplan', icon: '📅', subs: [['plan', 'Dagene'], ['netter', 'Overnatting'], ['scenarier', 'Scenarioer'], ['tidslinje', 'Kalender og sol'], ['dagplan', 'Avansert dagsfordeling']] },
-  { id: 'vaerkite', label: 'Vær & kite', icon: '🪁', subs: [['vaer', 'Vær langs ruten'], ['vaerkite', 'Kite og vind'], ['vind', 'Værmelding'], ['simulator', 'Simulator'], ['kite', 'Kitedatabase']] },
-  { id: 'utstyr', label: 'Utstyr & planlegging', short: 'Utstyr', icon: '🎒', subs: [['utstyr', 'Utstyr'], ['mat', 'Mat og vann'], ['sikkerhet', 'Sikkerhet'], ['overstyring', 'Vann-godkjenninger']] },
-  { id: 'eksport', label: 'Eksport & deling', short: 'Eksport', icon: '📤', subs: [['eksport', 'Eksport & deling']] },
-  { id: 'innstillinger', label: 'Innstillinger', short: 'Oppsett', icon: '⚙️', subs: [['lagring', 'Lagring og backup'], ['kilder', 'Datakilder'], ['modell', 'Modell og kalibrering']] },
-];
-const mainOf = (t: Tab): Main => (t === 'kart' ? 'oversikt' : SECTIONS.find((s) => s.subs.some(([x]) => x === t))?.id ?? 'oversikt');
-
-function HeaderSummary() {
+/** Kontekstlinjen: hvilket scenario du jobber i, avreise, resultat og varsler – synlig på alle sider. */
+function ContextBar() {
   const { plan, days } = useExpedition();
   const warnings = useWarnings();
   const tripDate = useStore((s) => s.tripDate);
   const dest = useStore((s) => s.project.destination);
+  const plans = useStore((s) => s.plans);
+  const mainPlanId = useStore((s) => s.mainPlanId);
+  const set = useStore((s) => s.set);
   const setTab = useStore((s) => s.setTab);
   const done = days.find((d) => d.remainingKm <= 0.05);
   const imp = warnings.filter((w) => w.level === 'viktig' && !w.ack).length;
   const adv = warnings.filter((w) => w.level === 'advarsel' && !w.ack).length;
   return (
     <div className="hsum">
-      <button className="hs" onClick={() => setTab('plan')}>📅 {new Date(`${tripDate}T12:00:00`).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })} · {plan.days.length} dager</button>
-      <button className="hs" onClick={() => setTab('plan')}>{done ? `🏁 ${dest || 'Mål'} dag ${done.day} kl. ${hhmm(done.arrival)}` : `⏳ ${days[days.length - 1]?.remainingKm.toFixed(0) ?? '–'} km igjen`}</button>
-      {(imp > 0 || adv > 0) && <button className="hs warnhs" onClick={() => setTab('oversikt')}>⚠️ {imp ? `${imp} viktige · ` : ''}{adv} advarsler</button>}
+      <label className="hs scensel" title="Scenarioet du ser på og redigerer. Bytt her – alle sider følger valget.">
+        <span className="hs-l">Scenario</span>
+        <select id="ctx-scenario" value={plan.id} onChange={(e) => (e.target.value === '__all' ? setTab('scenarier') : set({ activePlanId: e.target.value }))} aria-label="Valgt scenario">
+          {plans.map((p) => <option key={p.id} value={p.id}>{p.id === mainPlanId ? '★ ' : ''}{p.name}</option>)}
+          <option value="__all">Alle scenarioer og sammenligning …</option>
+        </select>
+      </label>
+      <button className="hs" onClick={() => setTab('plan')} title="Avreise og antall dager – trykk for å endre">📅 {new Date(`${tripDate}T12:00:00`).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })} · {plan.days.length} dager</button>
+      <button className="hs hs-arr" onClick={() => setTab('plan')} title="Beregnet ankomst">{done ? `🏁 ${dest || 'Mål'} dag ${done.day} kl. ${hhmm(done.arrival)}` : `⏳ ${days[days.length - 1]?.remainingKm.toFixed(0) ?? '–'} km igjen`}</button>
+      {(imp > 0 || adv > 0) && <button className="hs warnhs" onClick={() => setTab('oversikt')} title="Varsler langs ruten – vises i panelet ved kartet">⚠️ {imp ? `${imp} viktige · ` : ''}{adv} advarsler</button>}
     </div>
   );
+}
+
+const VALID_TABS = new Set<string>(['kart', ...SECTIONS.flatMap((x) => x.subs.map(([t]) => t))]);
+
+/** Faneskifte følger nettleserens historikk: tilbake-knappen (også på mobil) går til forrige side, og lenker som #mat åpner riktig side. */
+function useTabHistory(tab: Tab, setTab: (t: Tab) => void) {
+  const first = useRef(true);
+  const fromPop = useRef(false);
+  useEffect(() => {
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (h && VALID_TABS.has(h) && h !== tab) { fromPop.current = true; setTab(h as Tab); }
+    const onPop = () => {
+      const t = decodeURIComponent(location.hash.slice(1));
+      if (VALID_TABS.has(t)) { fromPop.current = true; setTab(t as Tab); }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const want = `#${tab}`;
+    try {
+      if (first.current) { first.current = false; if (location.hash !== want) history.replaceState(history.state, '', want); return; }
+      if (fromPop.current) { fromPop.current = false; return; }
+      if (location.hash !== want) history.pushState(null, '', want);
+    } catch { /* historikk utilgjengelig (f.eks. i innebygd visning) – navigasjonen virker likevel */ }
+  }, [tab]);
 }
 
 /** Prosjektnavn i toppen – trykk for å bytte eller endre prosjekt. */
@@ -99,6 +127,14 @@ export default function App() {
   const main = mainOf(tab);
   const section = SECTIONS.find((x) => x.id === main)!;
   const isMap = tab === 'kart' || tab === 'oversikt';
+  useTabHistory(tab, setTab);
+  // forrige side i en annen seksjon → «Tilbake»-knapp (f.eks. Start → Pakkeliste → tilbake til Start)
+  const [prev, setPrev] = useState<{ from: Tab; to: Tab } | null>(null);
+  const lastTab = useRef(tab);
+  useEffect(() => {
+    if (lastTab.current !== tab) setPrev(mainOf(lastTab.current) !== mainOf(tab) ? { from: lastTab.current, to: tab } : null);
+    lastTab.current = tab;
+  }, [tab]);
   useEffect(() => {
     loadInitialGpx().catch((e) => console.error('GPX', e));
   }, []);
@@ -120,20 +156,22 @@ export default function App() {
         </div>
         <nav className="mainnav" aria-label="Hovedmeny">
           {SECTIONS.map((x) => (
-            <button key={x.id} className={main === x.id ? 'on' : ''} onClick={() => setTab(x.subs[0][0])}>
+            <button key={x.id} className={main === x.id ? 'on' : ''} aria-current={main === x.id ? 'page' : undefined} title={`${x.label}: ${x.hint}`} onClick={() => setTab(main === x.id ? tab : x.subs[0][0])}>
               <span className="mn-ic">{x.icon}</span><span className="mn-l">{x.label}</span><span className="mn-s">{x.short ?? x.label}</span>
             </button>
           ))}
         </nav>
       </header>
       <div className="subbar">
+        {prev && prev.to === tab && <button className="btn small ghost backbtn" onClick={() => setTab(prev.from)} title="Tilbake til forrige side">← {tabLabel(prev.from)}</button>}
         {section.subs.length > 1 && (
           <nav className="subnav" aria-label="Undermeny">
-            {section.subs.map(([t, l]) => <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{l}</button>)}
+            {section.subs.map(([t, l]) => <button key={t} className={tab === t ? 'on' : ''} aria-current={tab === t ? 'page' : undefined} onClick={() => setTab(t)}>{l}</button>)}
           </nav>
         )}
-        <HeaderSummary />
+        <ContextBar />
       </div>
+      <PageIntro tab={tab} />
       <SaveBanners />
       <UpdateBanner />
       <main className={`main tab-${tab}`}>
@@ -161,11 +199,11 @@ export default function App() {
             {tech && <Suspense fallback={<p className="small muted">Laster …</p>}><TechDetails /></Suspense>}
           </details>
         )}
-        <ErrorBoundary key={tab} where={`side: ${tab}`} onHome={() => setTab('oversikt')}>
+        <ErrorBoundary key={tab} where={`side: ${tab}`} onHome={() => setTab('status')}>
         <Suspense fallback={<div className="page"><p className="muted">Laster …</p></div>}>
           {tab === 'plan' && <PlannerPage />}
           {tab === 'scenarier' && <ScenariosPage />}
-          {tab === 'prosjekter' && <ProjectsPage />}
+          {(tab === 'prosjekter' || tab === 'prosjekt') && <ProjectsPage />}
           {tab === 'eksport' && <ExportPage />}
           {tab === 'vaer' && <VaerPage />}
           {tab === 'netter' && <NightsPage />}

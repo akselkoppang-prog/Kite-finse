@@ -6,13 +6,15 @@ let fail = 0;
 const ok = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) fail++; };
 
 // v5-navigasjon: gamle fanenavn → hovedmeny + undermeny
-const NAV = { 'Scenarioer': ['Dagplan', 'Scenarioer'], 'Prosjekt': ['Oversikt', 'Prosjekt'], 'Eksport': ['Eksport', 'Eksport & deling'], 'Kart & rute': ['Oversikt'], 'Overstyringer': ['Utstyr & planlegging', 'Vann-godkjenninger'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Avansert dagsfordeling'], 'Dagene': ['Dagplan', 'Dagene'], 'Kite og vind': ['Vær & kite', 'Kite og vind'], 'Utstyr & offline': ['Utstyr & planlegging', 'Utstyr'], 'Mat': ['Utstyr & planlegging', 'Mat og vann'], 'Vær langs ruten': ['Vær & kite', 'Vær langs ruten'], 'Overnatting': ['Dagplan', 'Overnatting'], 'Status': ['Oversikt', 'Status'], 'Oppgaver': ['Oversikt', 'Oppgaver og team'], 'Vær & vind': ['Vær & kite', 'Værmelding'], 'Sikkerhet': ['Utstyr & planlegging', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+const NAV = { 'Scenarioer': ['Dagplan', 'Scenarioer'], 'Prosjekt': ['Prosjekt', 'Prosjektet'], 'Eksport': ['Prosjekt', 'Eksport og deling'], 'Kart & rute': ['Kart og rute', 'Kart'], 'Overstyringer': ['Kart og rute', 'Vann og is'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Grovplan og plan B'], 'Dagene': ['Dagplan', 'Dag for dag'], 'Kite og vind': ['Vær & kite', 'Kitevalg'], 'Utstyr & offline': ['Utstyr & mat', 'Pakkeliste'], 'Mat': ['Utstyr & mat', 'Mat og vann'], 'Vær langs ruten': ['Vær & kite', 'Vær langs ruten'], 'Overnatting': ['Dagplan', 'Overnatting'], 'Status': ['Start'], 'Oppgaver': ['Prosjekt', 'Oppgaver og team'], 'Vær & vind': ['Vær & kite', 'Vind i dag'], 'Sikkerhet': ['Utstyr & mat', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+// Legacy-suitene tester funksjonalitet i «Detaljert» visning (alt åpent); enkel visning testes i ux-e2e.cjs
+const DETAILED = () => { try { localStorage.setItem('kite-ui-prefs', JSON.stringify({ detailed: true, hints: true, guideHidden: false })); } catch {} };
 async function openAdv(p) { await p.evaluate(() => document.querySelectorAll('details.ov-adv').forEach((d) => { d.open = true; })); await p.waitForTimeout(200); }
 async function go(p, name) {
   const [m, s] = NAV[name] || [name];
-  await p.locator('nav.mainnav button', { hasText: m }).first().click();
+  await p.locator('nav.mainnav button', { hasText: m }).first().click(); await p.waitForTimeout(80);
   if (s && (await p.locator('nav.subnav').count())) await p.locator('nav.subnav button', { hasText: s }).first().click();
-  if (m === 'Oversikt') { await p.waitForTimeout(200); await openAdv(p); }
+  if (m === 'Kart og rute') { await p.waitForTimeout(200); await openAdv(p); }
 }
 // TESTSTUBBER (kun i test): realistisk svarformat for tjenester sandkassen ikke når
 async function stubs(p) {
@@ -72,14 +74,14 @@ const addDays = (d, n) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x
 (async () => {
   require('fs').mkdirSync(dir + '/v7', { recursive: true });
   const b = await chromium.launch();
-  const ctx = await b.newContext({ viewport: { width: 1366, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true });
+  const ctx = await b.newContext({ viewport: { width: 1366, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); await ctx.addInitScript(DETAILED);
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push('PAGEERR ' + e.message));
   p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|ERR_|net::/.test(m.text())) errs.push(m.text()); });
   p.on('dialog', (d) => d.accept(d.type() === 'prompt' ? 'Scenario B' : undefined));
   await stubs(p); await weatherStubs(p);
-  await p.goto(URL0, { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(3000);
+  await p.goto(URL0 + '#oversikt', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(3000);
   const today = new Date().toISOString().slice(0, 10);
   const tomorrow = addDays(today, 1);
 
@@ -184,12 +186,12 @@ const addDays = (d, n) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x
   await p.locator('button', { hasText: 'Lagre som nytt scenario' }).click(); await p.waitForTimeout(800);
   st = await state(p);
   const B = st.plans.find((x) => x.name === 'Scenario B');
-  await p.selectOption('#plan-sel', B.id); await p.waitForTimeout(800);
+  await p.selectOption('#ctx-scenario', B.id); await p.waitForTimeout(800);
   await p.fill('#plan-date', addDays(today, 6)); await p.waitForTimeout(800);
   st = await state(p);
   const A = st.plans.find((x) => x.id === st.mainPlanId);
   ok(st.plans.find((x) => x.id === B.id).tripDate === addDays(today, 6) && A.tripDate === tomorrow, '13. scenario B har egen avreise; hovedplanen er uendret');
-  await p.selectOption('#plan-sel', A.id); await p.waitForTimeout(800);
+  await p.selectOption('#ctx-scenario', A.id); await p.waitForTimeout(800);
   ok((await state(p)).tripDate === tomorrow, '13. å bytte tilbake gir hovedplanens dato');
   await go(p, 'Scenarioer'); await p.waitForTimeout(800);
   const cmp = p.locator('.scen', { hasText: '' }).filter({ has: p.locator(`input[value="Scenario B"]`) });
@@ -219,10 +221,10 @@ const addDays = (d, n) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x
 
   // 16. iPad og mobil
   for (const [name, dev] of [['iPad', devices['iPad (gen 7)']], ['mobil', devices['iPhone 13']]]) {
-    const c = await b.newContext({ ...dev, serviceWorkers: 'block' });
+    const c = await b.newContext({ ...dev, serviceWorkers: 'block' }); await c.addInitScript(DETAILED);
     const mp = await c.newPage(); await stubs(mp); await weatherStubs(mp);
     const merr = []; mp.on('pageerror', (e) => merr.push(e.message));
-    await mp.goto(URL0, { waitUntil: 'domcontentloaded' }); await mp.waitForTimeout(2500);
+    await mp.goto(URL0 + '#oversikt', { waitUntil: 'domcontentloaded' }); await mp.waitForTimeout(2500);
     let worst = 0;
     for (const t of ['Status', 'Oppgaver', 'Overnatting', 'Vær langs ruten', 'Utstyr & offline', 'Mat', 'Dagene']) { await go(mp, t); await mp.waitForTimeout(800); worst = Math.max(worst, await noScroll(mp)); await mp.screenshot({ path: `${dir}/v7/${name}-${t.replace(/\W+/g, '')}.png` }); }
     ok(worst <= 1, `16. ${name}: ingen horisontal scroll på nye sider (${worst}px)`);

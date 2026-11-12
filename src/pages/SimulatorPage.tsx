@@ -1,3 +1,4 @@
+import { Advanced, Term } from '../components/ux';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as echarts from 'echarts/core';
 import { LineChart } from 'echarts/charts';
@@ -248,11 +249,12 @@ export default function SimulatorPage() {
               {mcProg != null && <Progress f={mcProg} />}
               {unc && <span className="small">Total tid P10–P50–P90: <b>{hm(unc.p10)} – {hm(unc.p50)} – {hm(unc.p90)}</b> (varierer c_F/glidetall ±15 %, komfortfart ±10 %, vind ± variabilitet, retning ±15°)</span>}
             </div>
-            <p className="small muted">Alle tall er <b>beregnet</b> med en forenklet fysikkmodell og dine antakelser – ikke målt. Tidene er punktestimater; bruk usikkerhetsberegningen for et intervall.</p>
+            <p className="small muted">Ord: <Term k="twa">TWA</Term> · <Term k="vmg">VMG</Term> · <Term k="polar">polar</Term> · <Term k="kast">kast</Term>. Alle tall er <b>beregnet</b> med en forenklet fysikkmodell og dine antakelser – ikke målt. Tidene er punktestimater; bruk usikkerhetsberegningen for et intervall.</p>
           </>
         )}
       </Card>
 
+      <Advanced className="wide" title="Kitevurdering for vindfordelingen" hint="hvor godt hver kite passer vinden på ruten">
       <Card title={`Kitevurdering for vindfordelingen (typisk TWA på ruten ${Math.round(typicalTwa)}°)`} className="wide" right={<Kind k="beregnet" />}>
         <div className="tablewrap">
           <table className="tbl small">
@@ -283,7 +285,9 @@ export default function SimulatorPage() {
         </div>
         <p className="small muted">Produsentens vindområder gjelder vanligvis vann og ~75–80 kg uten pulk og vises bare som referanse. Fysikkvinduet er beregnet for {s.riderKg + s.pulkKg + s.simParams.extraKg} kg på «{s.snow}». Ditt eget vindu (Kite-quiver) overstyrer modellen.</p>
       </Card>
+      </Advanced>
 
+      <Advanced className="wide" title="Samme rute og vind med hver kite" hint="sammenlign tid og fart">
       <Card title={`Samme rute og vind med hver kite (${m.avg} m/s fra ${m.dir}°)`} className="wide" right={<Kind k="beregnet" />}>
         <div className="seg small">
           {KITES.map((k) => (
@@ -331,6 +335,7 @@ export default function SimulatorPage() {
         <PolarChart ids={s.sim.compareIds} windMs={m.avg} />
         <p className="small muted">Kurvene viser modellens fart over bakken (ikke fremdrift) ved hver TWA. Flatt topp-platå = begrenset av komfortfarten ({s.simParams.comfortKmh} km/t × terrengfaktor {s.simParams.terrainFactor}). Upwind-evnen vises der kurven stiger fra 0.</p>
       </Card>
+      </Advanced>
 
       {res && (
         <Card title="Etapper (≈2 km)" className="wide">

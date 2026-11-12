@@ -1,3 +1,4 @@
+import { Advanced } from '../components/ux';
 import { useState } from 'react';
 import { useStore } from '../state/store';
 import { useActiveRoute, useBarrierCheck, useTerrain, useDayPlan, useProfile } from '../state/derived';
@@ -118,6 +119,7 @@ export default function SafetyPage() {
         </div>
       </Card>
 
+      <Advanced className="wide" title="Hva betyr fargene?" hint="forklaring på verifiseringsstatus">
       <Card title="Verifiseringsstatus – forklaring">
         <ul className="legend-list small">
           <li><Badge s="GRØNN" /> Kontrollert mot angitt datakilde og dato. Betyr IKKE automatisk trygt.</li>
@@ -127,6 +129,7 @@ export default function SafetyPage() {
         </ul>
         <p className="small">Datakategorier: <Kind k="kartdata" /> <Kind k="forslag" /> <Kind k="beregnet" /> <Kind k="uverifisert" /> <Kind k="sjekk-selv" /></p>
       </Card>
+      </Advanced>
 
       <Card title="Risikooversikt" className="wide">
         <div className="risks">
@@ -139,6 +142,7 @@ export default function SafetyPage() {
         </div>
       </Card>
 
+      <Advanced className="wide" title="Vannregister" hint="regulerte magasiner langs ruten">
       <Card title="Vannregister (Mår-reguleringen m.fl.)" className="wide">
         <div className="tablewrap">
           <table className="tbl small">
@@ -165,6 +169,7 @@ export default function SafetyPage() {
         </div>
         <p className="small muted">HRV/LRV er hentet fra sekundærkilder (SNL/Wikipedia) 2026-11-03 og må bekreftes mot NVE. Når NVE-magasiner lastes, vises NVEs egne attributter i kartet.</p>
       </Card>
+      </Advanced>
 
       <Card title="Skredvarsel (Varsom)" right={<button className="btn small" onClick={loadAva} disabled={!route}>Hent varsel</button>}>
         <p className="small muted">Varsles 1. desember–31. mai. Utenfor sesong er svaret tomt.</p>
@@ -237,6 +242,7 @@ function DescentCard() {
     ['Pulk 40 kg', 'Ingen kilde bekrefter at Ryes vei er egnet med lastet pulk. Krever bremsetau/kjetting, evt. bære/dra pulk i krappe svinger.', 'GUL'],
   ];
   return (
+    <Advanced className="wide" title="Sluttnedstigning Gvepseborg → Rjukan" hint="eget segment">
     <Card title="Sluttnedstigning Gvepseborg → Rjukan (eget segment)" className="wide">
       <div className="risks">
         <div className="risk">
@@ -264,5 +270,6 @@ function DescentCard() {
       </ul>
       <p className="small muted"><Kind k="sjekk-selv" /> Kontakt Visit Rjukan / Tinn kommune om vinterstatus og om det finnes restriksjoner i akebakken.</p>
     </Card>
+    </Advanced>
   );
 }

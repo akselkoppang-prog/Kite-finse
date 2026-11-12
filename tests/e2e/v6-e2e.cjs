@@ -6,13 +6,15 @@ let fail = 0;
 const ok = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) fail++; };
 
 // v5-navigasjon: gamle fanenavn → hovedmeny + undermeny
-const NAV = { 'Scenarioer': ['Dagplan', 'Scenarioer'], 'Prosjekt': ['Oversikt', 'Prosjekt'], 'Eksport': ['Eksport', 'Eksport & deling'], 'Kart & rute': ['Oversikt'], 'Overstyringer': ['Utstyr & planlegging', 'Vann-godkjenninger'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Avansert dagsfordeling'], 'Dagene': ['Dagplan', 'Dagene'], 'Kite og vind': ['Vær & kite', 'Kite og vind'], 'Utstyr & offline': ['Utstyr & planlegging', 'Utstyr'], 'Vær & vind': ['Vær & kite', 'Værmelding'], 'Sikkerhet': ['Utstyr & planlegging', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+const NAV = { 'Scenarioer': ['Dagplan', 'Scenarioer'], 'Prosjekt': ['Prosjekt', 'Prosjektet'], 'Eksport': ['Prosjekt', 'Eksport og deling'], 'Kart & rute': ['Kart og rute', 'Kart'], 'Overstyringer': ['Kart og rute', 'Vann og is'], 'Kite-quiver': ['Vær & kite', 'Kitedatabase'], 'Kalender': ['Dagplan', 'Kalender og sol'], 'Dagplan': ['Dagplan', 'Grovplan og plan B'], 'Dagene': ['Dagplan', 'Dag for dag'], 'Kite og vind': ['Vær & kite', 'Kitevalg'], 'Utstyr & offline': ['Utstyr & mat', 'Pakkeliste'], 'Mat': ['Utstyr & mat', 'Mat og vann'], 'Vær langs ruten': ['Vær & kite', 'Vær langs ruten'], 'Overnatting': ['Dagplan', 'Overnatting'], 'Status': ['Start'], 'Oppgaver': ['Prosjekt', 'Oppgaver og team'], 'Vær & vind': ['Vær & kite', 'Vind i dag'], 'Sikkerhet': ['Utstyr & mat', 'Sikkerhet'], 'YTELSESSIMULATOR': ['Vær & kite', 'Simulator'], 'Modell & kalibrering': ['Innstillinger', 'Modell og kalibrering'], 'Datakilder & diagnose': ['Innstillinger', 'Datakilder'], 'Innstillinger / Lagring': ['Innstillinger', 'Lagring og backup'] };
+// Legacy-suitene tester funksjonalitet i «Detaljert» visning (alt åpent); enkel visning testes i ux-e2e.cjs
+const DETAILED = () => { try { localStorage.setItem('kite-ui-prefs', JSON.stringify({ detailed: true, hints: true, guideHidden: false })); } catch {} };
 async function openAdv(p) { await p.evaluate(() => document.querySelectorAll('details.ov-adv').forEach((d) => { d.open = true; })); await p.waitForTimeout(200); }
 async function go(p, name) {
   const [m, s] = NAV[name] || [name];
-  await p.locator('nav.mainnav button', { hasText: m }).first().click();
+  await p.locator('nav.mainnav button', { hasText: m }).first().click(); await p.waitForTimeout(80);
   if (s && (await p.locator('nav.subnav').count())) await p.locator('nav.subnav button', { hasText: s }).first().click();
-  if (m === 'Oversikt') { await p.waitForTimeout(200); await openAdv(p); }
+  if (m === 'Kart og rute') { await p.waitForTimeout(200); await openAdv(p); }
 }
 // TESTSTUBBER (kun i test): realistisk svarformat for tjenester sandkassen ikke når
 async function stubs(p) {
@@ -61,7 +63,7 @@ const dlTo = async (p, click, name) => {
 (async () => {
   require('fs').mkdirSync(dir + '/v6', { recursive: true });
   const b = await chromium.launch();
-  const ctx = await b.newContext({ viewport: { width: 1366, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true });
+  const ctx = await b.newContext({ viewport: { width: 1366, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); await ctx.addInitScript(DETAILED);
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push('PAGEERR ' + e.message));
@@ -70,7 +72,7 @@ const dlTo = async (p, click, name) => {
   p.on('dialog', (d) => d.accept(d.type() === 'prompt' ? promptAnswer : undefined));
   await stubs(p);
   await p.route('**/cache.kartverket.no/**', (r) => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: require('fs').readFileSync(__dirname + '/testtile.png') }));
-  await p.goto(URL0, { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(3000);
+  await p.goto(URL0 + '#oversikt', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(3000);
   const st0 = await state(p);
   const orig = { camps: (st0.camps || []).length, plans: (st0.plans || [1]).length, route0: st0.routes[0].waypoints.length, pid: (await projects(p))[0].id };
 
@@ -92,7 +94,8 @@ const dlTo = async (p, click, name) => {
   await p.fill('#new-proj-name', 'Hardangervidda Snowkite Training'); await p.click('#new-proj-ok'); await p.waitForTimeout(2500);
   const stH = await state(p);
   ok(stH.project.name === 'Hardangervidda Snowkite Training' && stH.routes.length === 0 && stH.camps.length === 0, 'P3. nytt tomt prosjekt opprettet og åpnet (ingen ruter/teltplasser)');
-  ok(/Hardangervidda/.test(await p.locator('#proj-name-header').innerText()) && await p.locator('.leaflet-container').isVisible(), 'P3. toppen viser det nye prosjektet, kartet åpnes');
+  ok(/Hardangervidda/.test(await p.locator('#proj-name-header').innerText()) && await p.locator('#guide').isVisible(), 'P3. toppen viser det nye prosjektet, Start med kom-i-gang åpnes');
+  await go(p, 'Kart & rute'); await p.waitForTimeout(400);
   await go(p, 'Prosjekt'); await p.waitForTimeout(600);
   await p.locator('button', { hasText: '+ Nytt prosjekt' }).click();
   await p.fill('#new-proj-name', 'Future expedition concept');
@@ -285,10 +288,10 @@ const dlTo = async (p, click, name) => {
 
   // ---------- iPad / mobil ----------
   for (const [name, dev] of [['iPad', devices['iPad (gen 7)']], ['iPad liggende', devices['iPad (gen 7) landscape']], ['mobil', devices['iPhone 13']]]) {
-    const c = await b.newContext({ ...dev, serviceWorkers: 'block' });
+    const c = await b.newContext({ ...dev, serviceWorkers: 'block' }); await c.addInitScript(DETAILED);
     const mp = await c.newPage(); await stubs(mp);
     const merr = []; mp.on('pageerror', (e) => merr.push(e.message));
-    await mp.goto(URL0, { waitUntil: 'domcontentloaded' }); await mp.waitForTimeout(2500);
+    await mp.goto(URL0 + '#oversikt', { waitUntil: 'domcontentloaded' }); await mp.waitForTimeout(2500);
     let worst = 0;
     for (const t of ['Prosjekt', 'Scenarioer', 'Eksport', 'Dagene', 'Kart & rute']) { await go(mp, t); await mp.waitForTimeout(700); worst = Math.max(worst, await noScroll(mp)); if (name === 'iPad' || name === 'mobil') await mp.screenshot({ path: `${dir}/v6/${name}-${t.replace(/\W+/g, '')}.png` }); }
     ok(worst <= 1, `M. ${name}: ingen horisontal scroll (prosjekt, scenarioer, eksport, dager, kart) (${worst}px)`);

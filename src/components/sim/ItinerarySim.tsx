@@ -45,7 +45,7 @@ export default function ItinerarySim() {
             <div key={pl.id} className="itin">
               <div className="row">
                 <input value={pl.name} onChange={(e) => s.set({ itineraries: plans.map((p) => (p.id === pl.id ? { ...p, name: e.target.value } : p)) })} aria-label="Navn på plan" />
-                <button className="link danger" onClick={() => s.set({ itineraries: plans.filter((p) => p.id !== pl.id) })}>slett</button>
+                <button className="link danger" onClick={() => confirm(`Slette reiseplanen «${pl.name}»?`) && s.set({ itineraries: plans.filter((p) => p.id !== pl.id) })}>slett</button>
               </div>
               {pl.dayKm.map((km, i) => (
                 <label key={i} className="small">Dag {i + 1}: {km} km

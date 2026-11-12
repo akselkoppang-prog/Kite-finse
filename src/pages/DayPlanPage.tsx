@@ -1,3 +1,4 @@
+import { Empty } from '../components/ux';
 import { useMemo, useState } from 'react';
 import { useStore } from '../state/store';
 import { useActiveRoute, useBarrierCheck, useDayPlan, useProfile, useTerrain } from '../state/derived';
@@ -53,7 +54,7 @@ export default function DayPlanPage() {
     return [...fromWps, ...fromMarkers].sort((a, b) => a.d - b.d);
   }, [route, s.markers, s.customCategories, cum]);
 
-  if (!route) return <div className="page"><Card title="Dagplan"><p>Ingen aktiv rute.</p></Card></div>;
+  if (!route) return <div className="page"><Empty icon="🗺️" title="Ingen rute valgt" actions={<button className="btn small" onClick={() => useStore.getState().setTab('oversikt')}>Gå til kartet</button>}>Grovplanen regnes ut fra ruten. Velg eller last inn en rute på kartet først.</Empty></div>;
 
   const setBreaks = (b: number[], text: string) => {
     s.setDayBreaks(route.id, b);
@@ -221,7 +222,7 @@ export default function DayPlanPage() {
                         <div className="btns">
                           <button className="btn small" onClick={() => s.set({ camps: s.camps.map((x) => (x.id === c.id ? { ...x, approved: !x.approved } : x)) })}>{c.approved ? 'Fjern godkjenning' : 'Godkjenn (mitt valg)'}</button>
                           <button className="btn small ghost" onClick={() => s.focusOn(c.lat, c.lon, 14)}>Vis</button>
-                          <button className="btn small danger" onClick={() => s.set({ camps: s.camps.filter((x) => x.id !== c.id) })}>Fjern</button>
+                          <button className="btn small danger" onClick={() => confirm(`Fjerne overnattingsstedet «${c.name}»?`) && s.set({ camps: s.camps.filter((x) => x.id !== c.id) })}>Fjern</button>
                         </div>
                       </div>
                     ))}
